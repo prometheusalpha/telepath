@@ -11,6 +11,7 @@ import (
 
 	"telepath/internal/model"
 	"telepath/internal/store"
+	"telepath/internal/vars"
 )
 
 const (
@@ -22,6 +23,10 @@ type app struct {
 	ws   *model.Workspace
 	path string // "" keeps the workspace in memory, as tests do
 	tree tree
+	env  vars.Env // ws.Env, looked up as the views build
+
+	envOpen  bool
+	envDraft model.KV
 
 	files    ui.OutlineState[string]
 	depth    int  // of the row being built, from the outline's Prefix
@@ -64,6 +69,7 @@ func newApp(ws *model.Workspace, path string) *app {
 		return true
 	})
 	a.reindex()
+	a.env = vars.NewEnv(a.ws.Env)
 	return a
 }
 
@@ -71,6 +77,7 @@ func newApp(ws *model.Workspace, path string) *app {
 // burst of edits writes once.
 func (a *app) changed() {
 	a.reindex()
+	a.env = vars.NewEnv(a.ws.Env)
 	a.pruneTabs()
 	a.dirty, a.saveAt = true, time.Time{}
 }
@@ -129,6 +136,7 @@ func (a *app) view(c *ui.Context) {
 	}
 	ui.Split(c, &a.sidebarWidth, func() { a.sidebar(c) }, func() { a.content(c) }).
 		SplitReset(240).Fill()
+	a.envModal(c)
 	a.autosave(c)
 }
 
@@ -182,6 +190,10 @@ func main() {
 					win.Update(func() { a.closeTab(a.active) })
 				}},
 				{Label: "Close Window", Accelerator: "CmdOrCtrl+Shift+W", Role: mygo.RoleClose},
+				mygo.Separator(),
+				{Label: "Variables…", Accelerator: "CmdOrCtrl+E", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(func() { a.envOpen = true })
+				}},
 			}},
 			{Role: mygo.RoleEditMenu},
 			{Role: mygo.RoleWindowMenu},

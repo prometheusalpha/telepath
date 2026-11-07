@@ -20,8 +20,9 @@ go vet ./... && go test ./...
 - `internal/model`: workspace, cây `Node` (đúng một trong `Folder`/`Request` khác nil), Add/Remove/Duplicate. Không phụ thuộc UI.
 - `internal/store`: đọc/ghi `workspace.json`, ghi qua file `.tmp` rồi rename.
 - `internal/model/url.go`: đồng bộ URL ↔ Query, nhận diện `:name` trong path.
+- `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
@@ -58,6 +59,15 @@ go vet ./... && go test ./...
 - Form có label thì dùng `ui.Form` + `ui.Field` (bấm vào label sẽ focus control). Control nào phải giữ đúng chiều rộng của nó (như Segmented) thì bọc trong `ui.Row`, không thì bị kéo dài theo field.
 - `TextInput.Password()` chỉ che chữ trong những frame có gọi nó; muốn hiện thì frame đó không gọi nữa.
 - Credential được lưu dạng plain text trong `workspace.json`.
+
+### Biến
+- Chỉ có một bộ biến (`Workspace.Env`). `a.env` là bản map đã dựng sẵn, được làm lại trong `changed()`; view tra trong map này chứ không duyệt `ws.Env` mỗi frame.
+- Biến chỉ được thay lúc gửi (`a.env.Request` trên main thread, rồi mới chuyển bản copy cho goroutine). Model và các ô nhập luôn giữ nguyên `{{name}}`.
+- Biến không có giá trị thì được gửi nguyên văn và báo trong `tab.missing`; giá trị của một biến không được thay tiếp, nên biến không thể tự lặp vào chính nó.
+- `Refs` và `Expand` dùng chung một hàm `scan`; sửa cú pháp thì chỉ sửa ở đó.
+- `highlightVars` tô màu bằng `TextRanges` (vị trí tính theo rune). Ô bị `Password()` thì không hiện được màu.
+- Biến secret chỉ được che trong UI, file vẫn lưu dạng plain text (Phase 9 sẽ chuyển sang Keychain).
+- ⌘E (Variables…) nằm trong menu bar, không xử lý trong view.
 
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.

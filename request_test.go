@@ -108,3 +108,5 @@ func TestEditAndCloseTabs(t *testing.T) {
 		t.Error("deleting a request leaves its tab open")
 	}
 }
+
+func keyValue(k, v string) model.KV { return model.KV{Key: k, Value: v, Enabled: true} }

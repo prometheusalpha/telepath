@@ -23,6 +23,7 @@ type kvOptions struct {
 	fixedKeys   bool
 	suggestions []string // for keys
 	files       bool     // rows may send a file (multipart)
+	secrets     bool     // rows may hide their values (variables)
 }
 
 // kvTable edits rows, with a blank row last for adding one (none with
@@ -59,6 +60,19 @@ func (a *app) kvTable(c *ui.Context, rows *[]model.KV, draft *model.KV, o kvOpti
 					}
 				}
 				changed = a.valueInput(c, kv, fmt.Sprintf("%s value %d", o.name, i+1), !kv.Enabled && !o.fixedKeys, o, setFile) || changed
+				if o.secrets {
+					label, svg := fmt.Sprintf("Hide %s %d", o.name, i+1), unlockIcon
+					if kv.Secret {
+						label, svg = fmt.Sprintf("Show %s %d", o.name, i+1), lockIcon
+					}
+					b := iconButton(c, svg, label)
+					if kv.Secret {
+						b.TextColor(t.Accent)
+					}
+					if b.Clicked() {
+						kv.Secret, changed = !kv.Secret, true
+					}
+				}
 				if o.fixedKeys {
 					ui.Box(c).Size(26, 26).Shrink(0)
 				} else if iconButton(c, closeIcon, fmt.Sprintf("Delete %s %d", o.name, i+1)).Clicked() {
@@ -79,6 +93,9 @@ func (a *app) kvTable(c *ui.Context, rows *[]model.KV, draft *model.KV, o kvOpti
 			a.keyInput(c, &draft.Key, o.name+" new key", false, o)
 			// The draft becomes a row in the frame the path lands in.
 			a.valueInput(c, draft, o.name+" new value", false, o, func(path string) { draft.Value = path })
+			if o.secrets {
+				ui.Box(c).Size(26, 26).Shrink(0)
+			}
 			ui.Box(c).Size(26, 26).Shrink(0)
 		})
 	})
@@ -104,6 +121,8 @@ func (a *app) keyInput(c *ui.Context, key *string, label string, muted bool, o k
 	in.Grow(1).MinWidth(0).Font(mono).FontSize(12).Placeholder("Key").Label(label)
 	if muted {
 		in.TextColor(c.Theme().TextMuted)
+	} else if !o.secrets {
+		a.highlightVars(c, in, *key)
 	}
 	return in.Changed()
 }
@@ -131,8 +150,14 @@ func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, 
 		return changed
 	}
 	in := ui.TextInput(c, &kv.Value).Grow(2).MinWidth(0).Font(mono).FontSize(12).Placeholder("Value").Label(label)
-	if muted {
+	switch {
+	case kv.Secret:
+		in.Password()
+	case muted:
 		in.TextColor(c.Theme().TextMuted)
+	case !o.secrets:
+		// Variables' values aren't expanded, so they show no references.
+		a.highlightVars(c, in, kv.Value)
 	}
 	return in.Changed() || changed
 }

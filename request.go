@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -37,6 +38,9 @@ type tab struct {
 	resp *httpx.Response
 	err  error
 	body *editor.State
+	// missing are the variables the last send found no value for, which
+	// went as typed.
+	missing []string
 }
 
 func (t *tab) stop() {
@@ -54,10 +58,11 @@ func (a *app) send(tb *tab) {
 		return
 	}
 	tb.stop()
-	// The goroutine reads a copy: the user may keep editing meanwhile.
-	req := n.Request.Clone()
+	// The goroutine reads a copy, expanded: the user may keep editing
+	// meanwhile.
+	req, missing := a.env.Request(n.Request)
 	ctx, cancel := context.WithCancel(context.Background())
-	tb.sending, tb.cancel, tb.err = true, cancel, nil
+	tb.sending, tb.cancel, tb.err, tb.missing = true, cancel, nil, missing
 	seq := tb.seq
 	client := a.client
 	go func() {
@@ -98,7 +103,10 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			a.changed()
 		}
 		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).
-			Placeholder("https://api.example.com/users").Label("URL")
+			Placeholder("{{base}}/users").Label("URL")
+		if a.highlightVars(c, url, r.URL) {
+			url.Tooltip(a.env.Expand(r.URL, nil))
+		}
 		if url.Changed() {
 			r.QueryFromURL()
 			r.PathFromURL()
@@ -129,6 +137,14 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 func (a *app) responseView(c *ui.Context, tb *tab) {
 	t := c.Theme()
 	ui.Column(c).Fill().Children(func() {
+		if len(tb.missing) > 0 && !tb.sending {
+			names := make([]string, len(tb.missing))
+			for i, m := range tb.missing {
+				names[i] = "{{" + m + "}}"
+			}
+			ui.Text(c, "No value for "+strings.Join(names, ", ")+": sent as typed.").
+				FontSize(12).TextColor(t.Warning).Padding(6, 12).Background(t.Warning.Alpha(0.1))
+		}
 		switch {
 		case tb.sending:
 			ui.Column(c).Grow(1).Center().Gap(10).Children(func() {
@@ -173,7 +189,9 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 			size += " (showing the first " + httpx.FormatSize(httpx.MaxBody) + ")"
 		}
 		ui.Text(c, size).FontSize(12).TextColor(t.TextMuted)
-		ui.Spacer(c)
+		// Where it went, variables and path parameters filled in.
+		ui.Text(c, resp.URL).Font(mono).FontSize(11).TextColor(t.TextMuted).SingleLine().
+			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
 		ui.Tabs(c, &tb.respTab, "Body", fmt.Sprintf("Headers %d", len(resp.Headers)))
 	})
 	ui.Divider(c)

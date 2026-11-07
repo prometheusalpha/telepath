@@ -158,7 +158,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - `internal/vars`: thay `{{name}}` trong URL, params, path, headers, body, auth. Biến không tồn tại → giữ nguyên và cảnh báo.
 - Modal Variables (mở từ sidebar hoặc ⌘E): KVTable key/value/enabled, có cột "secret" để che value trong UI.
-- Trong ô URL/value: tô màu `{{var}}` (xanh nếu có, đỏ nếu thiếu); hover/tooltip hiện giá trị đã resolve.
+- Trong ô URL/value: tô màu `{{var}}` (xanh nếu có, đỏ nếu thiếu); hover/tooltip hiện giá trị đã resolve (hiện mới có tooltip ở ô URL).
 - Response panel có dòng nhỏ hiện URL cuối cùng đã resolve (để debug).
 
 **Xong khi:** đổi `baseUrl` một chỗ, mọi request dùng theo.
@@ -197,6 +197,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Khôi phục tab đang mở + tab active + kích thước split khi mở lại app.
 - Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌘L focus URL.
 - Response: nút copy body, lưu body ra file, cảnh báo/ cắt hiển thị khi response quá lớn.
+- Gợi ý biến khi gõ `{{` trong ô URL và các ô của bảng (Params, Path, Headers, Body form, Auth): hiện danh sách biến kèm giá trị (che biến secret), lọc theo chữ đang gõ, Enter/Tab chèn `{{name}}`.
 - Lưu password/token/API key (Auth) và biến secret vào Keychain qua module `secrets` của MyGo, thay vì plain text trong `workspace.json`.
 - Đóng gói bằng `mygo` CLI, icon app.
 

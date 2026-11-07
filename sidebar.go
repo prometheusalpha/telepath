@@ -60,6 +60,7 @@ func (a *app) sidebar(c *ui.Context) {
 		ui.Text(c, "COLLECTIONS").FontSize(11).FontWeight(600).LetterSpacing(0.6).
 			TextColor(t.TextMuted).Padding(8, 16, 6)
 		a.outline(c)
+		a.sidebarFooter(c)
 	})
 
 	n := a.deleting

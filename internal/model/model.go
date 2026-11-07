@@ -13,6 +13,7 @@ const Version = 1
 type Workspace struct {
 	Version int     `json:"version"`
 	Items   []*Node `json:"items"`
+	Env     []KV    `json:"env,omitempty"` // the one set of variables
 }
 
 // Node is a folder or a request: exactly one of Folder and Request is set.
@@ -46,6 +47,8 @@ type KV struct {
 	Enabled bool   `json:"enabled"`
 	// File makes Value a path whose file a multipart body sends.
 	File bool `json:"file,omitempty"`
+	// Secret hides Value in the variables' table.
+	Secret bool `json:"secret,omitempty"`
 }
 
 const (
