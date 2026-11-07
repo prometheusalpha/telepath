@@ -197,3 +197,71 @@ func clone(n *Node) *Node {
 	}
 	return cp
 }
+
+// Place says where Move puts nodes: beside the target, or inside it.
+type Place int
+
+const (
+	Before Place = iota
+	After
+	Into // the end of a folder's children
+)
+
+// Move puts the nodes with ids by target, keeping their order in the tree;
+// an empty target is the end of the top level. It moves nothing and
+// returns false when the target is one of the nodes or inside one, as a
+// folder dropped into itself would be.
+func (w *Workspace) Move(ids []string, target string, place Place) bool {
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	var nodes []*Node
+	inMoved := false // the walk is inside a node that moves
+	var walk func(items []*Node) bool
+	walk = func(items []*Node) bool {
+		for _, n := range items {
+			if n.ID == target && (inMoved || want[n.ID]) {
+				return false
+			}
+			top := want[n.ID] && !inMoved
+			if top {
+				nodes = append(nodes, n)
+				inMoved = true
+			}
+			if n.Folder != nil && !walk(n.Folder.Children) {
+				return false
+			}
+			if top {
+				inMoved = false
+			}
+		}
+		return true
+	}
+	if !walk(w.Items) || len(nodes) == 0 {
+		return false
+	}
+	if target != "" {
+		if list, i := w.siblings(target); list == nil || place == Into && (*list)[i].Folder == nil {
+			return false
+		}
+	}
+	for _, n := range nodes {
+		w.Remove(n.ID)
+	}
+	if target == "" {
+		w.Items = append(w.Items, nodes...)
+		return true
+	}
+	list, i := w.siblings(target)
+	switch place {
+	case Into:
+		f := (*list)[i].Folder
+		f.Children = append(f.Children, nodes...)
+	case After:
+		*list = slices.Insert(*list, i+1, nodes...)
+	default:
+		*list = slices.Insert(*list, i, nodes...)
+	}
+	return true
+}

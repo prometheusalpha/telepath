@@ -49,6 +49,10 @@ type app struct {
 	selected string
 	selectID string // a node to choose once the outline has its row
 
+	press    press    // the row a press began on, to tell a click from a drag
+	dropHint dropHint // where a drag over the sidebar would drop, last frame
+	dropNext dropHint // and this frame
+
 	renaming      string
 	renameDraft   string
 	renameFocused bool

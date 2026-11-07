@@ -108,6 +108,14 @@ func (a *app) outline(c *ui.Context) {
 	// The prefix only notes where the row sits: node draws the indent and
 	// the arrow inside its own row, so a press anywhere on it lands there.
 	a.files.Prefix = func(r ui.OutlineRow) { a.depth, a.open = r.Depth, r.Open }
+	a.files.List.DragRows = func(rows []int) any {
+		ids := make(dragged, 0, len(rows))
+		for _, r := range rows {
+			ids = append(ids, a.files.Item(r))
+		}
+		return ids
+	}
+	a.dropHint, a.dropNext = a.dropNext, dropHint{}
 	// Row menus and keys only note what to do: changing the tree while the
 	// outline builds its rows would pull them from under it.
 	var later func()
@@ -124,6 +132,10 @@ func (a *app) outline(c *ui.Context) {
 			emptyState(c, "No requests yet", "Create one with +")
 		}
 	})
+	// Below the rows: the end of the top level.
+	if ids, ok := ui.Drop[dragged](out); ok {
+		later = func() { a.move(ids, "", model.After) }
+	}
 
 	a.selected = ""
 	if a.row >= 0 && a.row < a.files.Rows() {
@@ -150,20 +162,31 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 	row := ui.Row(c).Grow(1).MinWidth(0).Gap(6).AlignItems(ui.Center).
 		Padding(5, 8, 5, 8+14*float32(a.depth))
 	if a.renaming != n.ID {
-		// A press opens a request, and toggles a folder every time, quick
-		// presses too, as the arrow would. Observing leaves the press to
-		// the outline, which chooses the row with it, where Clicked would
-		// take it; the right button and Control-click open the menu
-		// instead.
+		// A click opens a request, and toggles a folder every time, quick
+		// clicks too, as the arrow would. Observing leaves the press to
+		// the outline, which chooses and drags the row with it, where
+		// Clicked would take it. It acts as the press ends and only if the
+		// pointer stayed put, so dragging a folder doesn't toggle it; the
+		// right button and Control-click open the menu instead.
 		id, folder := n.ID, n.Folder != nil
 		row.ObserveInput(func(ev ui.InputEvent) {
-			if ev.Kind != ui.InputPointerDown || ev.Button != 0 || ev.Mods&ui.Ctrl != 0 {
+			if ev.Button != 0 || ev.Mods&ui.Ctrl != 0 {
 				return
 			}
-			if folder {
-				a.toggle(id)
-			} else {
-				a.openTab(id)
+			switch ev.Kind {
+			case ui.InputPointerDown:
+				a.press = press{id: id, x: ev.X, y: ev.Y}
+			case ui.InputPointerUp:
+				p := a.press
+				a.press = press{}
+				if p.id != id || ev.Canceled || abs(ev.X-p.x) > 4 || abs(ev.Y-p.y) > 4 {
+					return
+				}
+				if folder {
+					a.toggle(id)
+				} else {
+					a.openTab(id)
+				}
 			}
 		})
 	}
@@ -199,7 +222,20 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 			later = func() { a.confirmDelete(n) }
 		}
 	})
+	// Where a drag would drop, as the last frame saw it.
+	hint := a.dropHint.id == n.ID
+	if hint && a.dropHint.place == model.Into {
+		row.Background(accentInk(t).Alpha(0.18))
+	}
 	row.Children(func() {
+		if hint && a.dropHint.place != model.Into {
+			line := ui.Box(c).Absolute().Left(8 + 14*float32(a.depth)).Right(0).Height(2).Radius(1).Background(accentInk(t))
+			if a.dropHint.place == model.Before {
+				line.Top(-1)
+			} else {
+				line.Bottom(-1)
+			}
+		}
 		// Muted grays and method hues both wash out on the accent fill of
 		// the chosen row.
 		// Requests keep the arrow's room so names line up with folders'.
@@ -231,7 +267,55 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 		}
 		ui.Text(c, n.Name).SingleLine().Grow(1).MinWidth(0)
 	})
+	if _, over := ui.DragOver[dragged](row); over {
+		a.dropNext = dropHint{n.ID, a.placeAt(row, n)}
+	}
+	if ids, ok := ui.Drop[dragged](row); ok {
+		place, target := a.placeAt(row, n), n.ID
+		later = func() { a.move(ids, target, place) }
+	}
 	return later
+}
+
+// dragged is what rows of the sidebar drag: the IDs of their nodes.
+type dragged []string
+
+type dropHint struct {
+	id    string
+	place model.Place
+}
+
+type press struct {
+	id   string
+	x, y float32
+}
+
+func abs(v float32) float32 { return max(v, -v) }
+
+// placeAt reads where in a row the pointer is: a request's top or bottom
+// half goes before or after it; a folder's top quarter before, its bottom
+// quarter after while closed, and the rest inside, as open folders show
+// their children right below.
+func (a *app) placeAt(row ui.Element, n *model.Node) model.Place {
+	_, y, _ := row.PointerPosition()
+	h := row.Bounds().H
+	switch {
+	case n.Folder == nil && y < h/2, n.Folder != nil && y < h/4:
+		return model.Before
+	case n.Folder == nil, y > h*3/4 && !a.files.Open.Has(n.ID):
+		return model.After
+	}
+	return model.Into
+}
+
+func (a *app) move(ids []string, target string, place model.Place) {
+	if !a.ws.Move(ids, target, place) {
+		return
+	}
+	if place == model.Into {
+		a.files.Open.Add(target)
+	}
+	a.changed()
 }
 
 func (a *app) renameInput(c *ui.Context, n *model.Node) {

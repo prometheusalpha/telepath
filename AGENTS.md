@@ -36,6 +36,9 @@ go vet ./... && go test ./...
 ### Sidebar (`ui.Outline`)
 - Đừng dùng `Clicked()` trên nội dung row: nó giữ lấy cú bấm và Outline không chọn được dòng nữa. Muốn phản ứng với click mà vẫn để Outline chọn thì dùng `ObserveInput` (lọc `InputPointerDown`, `Button == 0`, bỏ `Ctrl` vì Control-click trên macOS là mở menu).
 - `Prefix` chỉ ghi `Depth`/`Open` vào `a.depth`/`a.open`; `node()` tự vẽ phần thụt lề và chevron bên trong row để cả dòng là một vùng bấm. Không dùng `OutlineRow.Arrow()` (nó tự toggle, cộng với toggle của mình là thành hai lần).
+- Click trên dòng được tính lúc thả chuột (`InputPointerUp`), và chỉ khi con trỏ đi chưa tới 4px so với lúc ấn (`a.press`). Như vậy kéo một folder sẽ không làm nó mở/đóng. Đừng chuyển lại sang `InputPointerDown`.
+- Kéo thả: `List.DragRows` trả về `dragged` (danh sách ID); mỗi dòng gọi `ui.DragOver`/`ui.Drop`, và `placeAt` tính trên/dưới/trong từ `PointerPosition` so với `Bounds().H`. Vạch báo vị trí vẽ theo `a.dropHint` của frame trước, vì input của container chỉ đọc được sau khi đã dựng xong các con. Thả xuống vùng trống dưới các dòng thì node chuyển ra cuối cấp ngoài cùng. Không dùng `List.Reorder` vì nó không thả vào được folder đang đóng hoặc folder rỗng.
+- `Workspace.Move` từ chối (trả `false`, không đổi gì) khi thả một node vào chính nó, vào node con của nó, hoặc thả `Into` một request.
 - Không sửa cây trong lúc Outline đang build row (menu, phím tắt): gán vào `later` rồi chạy sau khi Outline build xong.
 - Folder rỗng phải trả về slice rỗng khác nil từ hàm `children`, nếu không Outline coi nó là leaf.
 - Muốn chọn một node mới tạo: gán `a.selectID`, frame sau mới tìm được row index của nó.
