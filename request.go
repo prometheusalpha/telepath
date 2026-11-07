@@ -120,7 +120,7 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		if a.highlightVars(c, url, r.URL) {
 			url.Tooltip(a.env.Expand(r.URL, nil))
 		}
-		if url.Changed() {
+		if a.suggestVars(c, url, &r.URL, "URL") || url.Changed() {
 			r.QueryFromURL()
 			r.PathFromURL()
 			a.changed()
@@ -390,7 +390,7 @@ func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
 				if secret && !tb.reveal {
 					in.Password()
 				}
-				changed = in.Changed() || changed
+				changed = a.suggestVars(c, in, value, "Auth "+label) || in.Changed() || changed
 				if !secret {
 					return
 				}

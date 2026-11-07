@@ -30,6 +30,12 @@ type app struct {
 	envOpen  bool
 	envDraft model.KV
 
+	suggest    suggestion // the variables listed under the input typed in
+	dismissed  dismissal
+	suggested  string // the input a variable was put in between frames
+	caretLabel string // the input whose caret goes to caretAt next frame
+	caretAt    int
+
 	searchOpen bool
 	query      string
 	hits       []hit // what the search shows, for its keys between frames

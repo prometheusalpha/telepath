@@ -124,7 +124,11 @@ func (a *app) keyInput(c *ui.Context, key *string, label string, muted bool, o k
 	} else if !o.secrets {
 		a.highlightVars(c, in, *key)
 	}
-	return in.Changed()
+	// The header keys' own suggestions are names, not variables.
+	if o.secrets || o.suggestions != nil {
+		return in.Changed()
+	}
+	return a.suggestVars(c, in, key, label) || in.Changed()
 }
 
 func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, o kvOptions, setFile func(string)) bool {
@@ -158,6 +162,9 @@ func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, 
 	case !o.secrets:
 		// Variables' values aren't expanded, so they show no references.
 		a.highlightVars(c, in, kv.Value)
+	}
+	if !o.secrets && a.suggestVars(c, in, &kv.Value, label) {
+		changed = true
 	}
 	return in.Changed() || changed
 }

@@ -23,7 +23,7 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
@@ -75,6 +75,9 @@ go vet ./... && go test ./...
 - `highlightVars` tô màu bằng `TextRanges` (vị trí tính theo rune). Ô bị `Password()` thì không hiện được màu.
 - Biến secret chỉ được che trong UI, file vẫn lưu dạng plain text (Phase 9 sẽ chuyển sang Keychain).
 - ⌘E (Variables…) nằm trong menu bar, không xử lý trong view.
+- Gợi ý biến (`suggestVars`): gọi ngay sau khi dựng ô nhập, truyền con trỏ tới giá trị và một label duy nhất. Hàm trả `true` khi đã chèn biến, vì `Changed()` của ô không báo việc này; nơi gọi phải xử lý như khi ô bị sửa (`a.changed()`, đồng bộ Query…).
+- Danh sách là `ui.Overlay` + `AttachTo` (không phải popover, để ô nhập vẫn giữ focus). Các dòng dùng `KeepFocus()`. ↑/↓/Enter/Tab/Esc bắt qua `OnTextKey`, mà hàm này có thể chạy giữa hai frame, nên vị trí con trỏ được tính lại từ `k.Text()` cộng phần chữ gõ thêm. `TextKey` không đặt được con trỏ: vị trí mong muốn ghi vào `a.caretLabel`/`a.caretAt` để frame sau gọi `SetTextSelection`.
+- Không có gợi ý ở: editor body (Text/JSON), ô key của Headers (đã có gợi ý tên header), và bảng Variables.
 
 ### Search (⌘K)
 - `SearchField` không cho `OnTextKey` chạm tới ô nhập bên trong, nên ↑/↓ chỉ di chuyển con trỏ chữ. Modal search dùng `TextInputBase` + `Search()` + icon tự vẽ. Enter là `Submitted()` của ô nhập, `OnTextKey` không thấy được phím này.
