@@ -126,6 +126,8 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Khu response (`SplitVerticalPercent` dưới request): status (màu theo 2xx/3xx/4xx/5xx), time, size; tab Body (code editor read-only, JSON tự pretty-print + highlight) và Headers (table).
 - Lỗi mạng hiển thị rõ ràng trong khu response, không popup.
 - Auto-save: mọi thay đổi trong editor ghi thẳng vào workspace (store tự debounce), không có trạng thái "chưa lưu".
+- ⌘W đóng tab: tự đặt menu bar vì menu mặc định của macOS dùng ⌘W cho Close Window (chuyển sang ⇧⌘W).
+- Response chỉ giữ trong bộ nhớ của tab, không lưu.
 
 **Xong khi:** gửi GET/POST tới một API thật và đọc được response.
 

@@ -112,6 +112,8 @@ func (a *app) outline(c *ui.Context) {
 	}
 	if n := a.tree.byID[a.selected]; n != nil && a.renaming == "" {
 		switch {
+		case out.Submitted() && n.Request != nil:
+			a.openTab(n.ID)
 		case a.files.List.Shortcut(c, 0, ui.KeyF2):
 			a.startRename(n)
 		case a.files.List.Shortcut(c, ui.Cmd, ui.KeyBackspace):
@@ -128,15 +130,21 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 	t := c.Theme()
 	row := ui.Row(c).Grow(1).MinWidth(0).Gap(6).AlignItems(ui.Center).
 		Padding(5, 8, 5, 8+14*float32(a.depth))
-	if n.Folder != nil && a.renaming != n.ID {
-		// Every press toggles, quick ones too, as the arrow would. Observing
-		// leaves the press to the outline, which chooses the row with it,
-		// where Clicked would take it; the right button and Control-click
-		// open the menu instead.
-		id := n.ID
+	if a.renaming != n.ID {
+		// A press opens a request, and toggles a folder every time, quick
+		// presses too, as the arrow would. Observing leaves the press to
+		// the outline, which chooses the row with it, where Clicked would
+		// take it; the right button and Control-click open the menu
+		// instead.
+		id, folder := n.ID, n.Folder != nil
 		row.ObserveInput(func(ev ui.InputEvent) {
-			if ev.Kind == ui.InputPointerDown && ev.Button == 0 && ev.Mods&ui.Ctrl == 0 {
+			if ev.Kind != ui.InputPointerDown || ev.Button != 0 || ev.Mods&ui.Ctrl != 0 {
+				return
+			}
+			if folder {
 				a.toggle(id)
+			} else {
+				a.openTab(id)
 			}
 		})
 	}

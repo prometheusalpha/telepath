@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -40,11 +41,19 @@ type app struct {
 	saveAt  time.Time
 	saveErr error
 
+	tabs   []*tab
+	active int // -1 with no tab open
+	split  float32
+	client *http.Client
+	// update runs fn on the main thread and redraws: the window's Update,
+	// or in tests whatever drives the Tester.
+	update func(fn func())
+
 	sidebarWidth float32
 }
 
 func newApp(ws *model.Workspace, path string) *app {
-	a := &app{ws: ws, path: path, row: -1, sidebarWidth: 240}
+	a := &app{ws: ws, path: path, row: -1, active: -1, split: 45, client: &http.Client{}, sidebarWidth: 240}
 	a.ws.Walk(func(n, _ *model.Node) bool {
 		if n.Folder != nil && n.Folder.Open {
 			a.files.Open.Add(n.ID)
@@ -59,6 +68,7 @@ func newApp(ws *model.Workspace, path string) *app {
 // burst of edits writes once.
 func (a *app) changed() {
 	a.reindex()
+	a.pruneTabs()
 	a.dirty, a.saveAt = true, time.Time{}
 }
 
@@ -131,9 +141,13 @@ func (a *app) content(c *ui.Context) {
 		}
 		card.Children(func() {
 			ui.Row(c).Height(max(bar.Height, titleBarHeight)-6).Shrink(0).AlignItems(ui.Center).
-				Padding(0, bar.Right+10, 0, 10).DragWindow()
+				Padding(0, bar.Right+10, 0, 8).DragWindow().Children(func() { a.tabBar(c) })
 			ui.Divider(c)
-			emptyState(c, "No request open", "Pick one from the sidebar, or press ⌘K to search")
+			if tb := a.current(); tb != nil {
+				a.requestView(c, tb)
+			} else {
+				emptyState(c, "No request open", "Pick one from the sidebar, or press ⌘K to search")
+			}
 		})
 	})
 }
@@ -156,7 +170,20 @@ func main() {
 				log.Print(err)
 			}
 		})
-		mygo.NewWindow(mygo.WindowOptions{
+		var win *mygo.Window
+		// The default menu's Close Window would take ⌘W from the tabs.
+		mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
+			{Role: mygo.RoleAppMenu},
+			{Label: "File", Submenu: []*mygo.MenuItem{
+				{Label: "Close Tab", Accelerator: "CmdOrCtrl+W", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(func() { a.closeTab(a.active) })
+				}},
+				{Label: "Close Window", Accelerator: "CmdOrCtrl+Shift+W", Role: mygo.RoleClose},
+			}},
+			{Role: mygo.RoleEditMenu},
+			{Role: mygo.RoleWindowMenu},
+		}))
+		win = mygo.NewWindow(mygo.WindowOptions{
 			Title:          "telepath",
 			Width:          1200,
 			Height:         780,
@@ -168,6 +195,7 @@ func main() {
 			Vibrancy:       mygo.VibrancySidebar,
 			Content:        ui.View(a.view),
 		})
+		a.update = win.Update
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
