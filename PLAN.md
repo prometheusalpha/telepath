@@ -1,6 +1,6 @@
 # Telepath — Plan
 
-**Trạng thái:** Phase 0–9 đã xong (xem `git log`).
+**Trạng thái:** Phase 0–10 đã xong (xem `git log`).
 
 API client desktop nhỏ gọn, viết bằng Go + MyGo native UI (`github.com/egoist/mygo` v0.8.3, package `ui`).
 
@@ -204,14 +204,15 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Lưu password/token/API key (Auth) và biến secret vào Keychain qua module `secrets` của MyGo, thay vì plain text trong `workspace.json`.
 - Đóng gói bằng `mygo` CLI, icon app.
 
-## Phase 10
-- Enter khi select -> rename tên request
-- Đổi font mono -> jetbrains mono nerd font + thêm ligature
-- màn settings
-- Icon + build mac app
-- Context menu của tab: close, close others
-- Nút focus request hiện tại ở sidebar
-- Syntax highlighting ở response json
+## Phase 10 — Tinh chỉnh
+
+- Sidebar: Enter trên dòng đang chọn là đổi tên (như Finder, F2 vẫn dùng được); ⌘↓ mở request.
+- Font mono: JetBrains Mono Nerd Font (bản Mono, có ligature) nhúng vào app, đăng ký tên `Telepath Mono`, bật các font feature như config Ghostty (`ss01`…`ss08`, `calt`, `cv09`, `dlig`, `pnum`, `lnum`, `case`).
+- Màn Settings (⌘, trong menu app, nút ở chân sidebar): Appearance, font code (font mono của máy hoặc font có sẵn), cỡ chữ của body request/response. Lưu trong workspace.
+- Context menu của tab: Close, Close Others.
+- Nút ở đầu sidebar: hiện request của tab đang mở trong cây (mở các folder cha, chọn và cuộn tới dòng đó).
+- Response JSON: theme editor riêng để key, string, number, true/false/null có màu khác nhau.
+- Icon mới: logo `design/logo.svg` màu trắng trên nền gradient đen → xám đậm.
 
 ---
 

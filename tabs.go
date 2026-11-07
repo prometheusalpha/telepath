@@ -62,7 +62,7 @@ func (a *app) current() *tab {
 
 func (a *app) tabBar(c *ui.Context) {
 	t := c.Theme()
-	closing := -1
+	closing, keeping := -1, -1
 	ui.Row(c).Grow(1).MinWidth(0).Gap(4).AlignItems(ui.Center).Clip().Children(func() {
 		for i, tb := range a.tabs {
 			n := a.tree.byID[tb.id]
@@ -90,13 +90,36 @@ func (a *app) tabBar(c *ui.Context) {
 					closing = i
 				}
 			})
+			pill.ContextMenu(func(m *ui.Menu) {
+				if m.Item("Close").Chosen() {
+					closing = i
+				}
+				if m.Item("Close Others").Disabled(len(a.tabs) == 1).Chosen() {
+					keeping = i
+				}
+			})
 			if pill.Clicked() {
 				a.active = i
 				a.touch()
 			}
 		}
 	})
-	if closing >= 0 {
+	switch {
+	case closing >= 0:
 		a.closeTab(closing)
+	case keeping >= 0:
+		a.closeOthers(keeping)
 	}
+}
+
+// closeOthers leaves the tab at i the only one, and active.
+func (a *app) closeOthers(i int) {
+	for j := len(a.tabs) - 1; j >= 0; j-- {
+		if j != i {
+			a.tabs[j].stop()
+		}
+	}
+	a.tabs = []*tab{a.tabs[i]}
+	a.active = 0
+	a.touch()
 }

@@ -8,13 +8,14 @@ API client desktop nhỏ (sidebar cây folder/request, tab, editor request, mộ
 go run .                 # chạy app
 go tool mygo dev         # chạy app với live reload (build lại khi sửa Go)
 go tool mygo build       # build production vào build/darwin-arm64/telepath.app (ký ad-hoc; thêm -skip-dmg cho nhanh)
+scripts/install.sh       # build, ký, kiểm tra chữ ký rồi thay bản trong /Applications (SIGN_IDENTITY=… để ký bằng chứng chỉ, mặc định ad-hoc; app đang chạy thì dừng, bảo quit trước)
 go vet ./... && go test ./...
 ```
 
 - Docs MyGo đúng version đang pin: `$(go list -m -f '{{.Dir}}' github.com/egoist/mygo)/docs/ui/*.md`; API thật thì grep `ui/api_gen.go`. Kiểm tra API trong source trước khi dùng, đừng đoán.
 - Skill bảo trì MyGo: `.agents/skills/mygo-maintenance/SKILL.md`.
-- Icon: nguồn là `design/icon.svg`, file app dùng là `resources/icon.png` (1024×1024). Đừng để file nguồn trong `resources/`, vì cả thư mục đó bị đóng gói vào app. Sửa SVG xong thì render lại PNG bằng một test tạm: `ui.Image(c, ui.MustParseSVG(svg)).Size(1024, 1024)` trong `ui.NewTester(view, 1024, 1024)`, nền root để `ui.Transparent`, rồi `png.Encode(tt.Image())`. Xong thì xoá test đó.
-- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` là `io.starchaser.telepath`; đừng đổi nữa, vì bản build dùng nó làm tên service Keychain giữ khoá mã hoá secret, đổi là không đọc lại được secret đã lưu.
+- Icon: nguồn là `design/icon.svg` (hình ở giữa là `design/logo.svg`, scale từ khung 1021 về 560), file app dùng là `resources/icon.png` (1024×1024). Đừng để file nguồn trong `resources/`, vì cả thư mục đó bị đóng gói vào app. Sửa SVG xong thì render lại PNG bằng một test tạm: `ui.Image(c, ui.MustParseSVG(svg)).Size(1024, 1024)` trong `ui.NewTester(view, 1024, 1024)`, nền root để `ui.Transparent`, rồi `png.Encode(tt.Image())`. Xong thì xoá test đó.
+- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` là `io.starchaser.telepath`. Service Keychain giữ khoá mã hoá secret được cố định là `keyService` (cũng là `io.starchaser.telepath`) trong `main.go`, không phụ thuộc vào identifier; đừng đổi hằng đó, đổi là không đọc lại được secret đã lưu.
 - `mygo dev` chạy app tên `<name> Dev` với identifier riêng, nên dữ liệu (`workspace.json` trong `PathUserData`) có thể khác với khi chạy `go run .`.
 
 ## Cấu trúc
@@ -25,11 +26,13 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
 ### Theme
+- Font mono nhúng sẵn (`fonts/`, đăng ký trong `fonts.go` với tên `Telepath Mono`); mọi chỗ `Font(mono)` đều kèm `FontFeatures(monoFeatures)` (feature lấy theo `~/.config/ghostty/config`, chỉ bật khi dùng font có sẵn của app, vì `ssXX` ở font khác là những glyph khác). `mono`, `monoFeatures` và `codeSize` là biến cấp package, `setMono(ws)` gán lại (trong `newApp` và khi đổi Settings); test nào đổi chúng thì phải trả lại mặc định.
+- Editor (body request/response) gọi `styleCode` mỗi frame: theme code (`lightCode`/`darkCode`, màu token JSON riêng) và font theo Settings.
 - `c.Theme()` mỗi frame bắt đầu lại từ theme light/dark của hệ thống. `applyTheme` chọn một trong hai theme dựng sẵn (`lightTheme`/`darkTheme`) theo `Dark`; đừng copy theme mới mỗi frame.
 - Đổi System/Light/Dark bằng `mygo.Theme.SetSource` (qua `a.setAppearance`) để vibrancy, menu, title bar và `c.Theme()` cùng đổi; không tự ép `darkTheme` trong view. Lựa chọn lưu ở `Workspace.Theme` và được áp dụng trước khi tạo cửa sổ. Dấu tích ở View > Appearance được set tay trong `setAppearance`, vì nút ở sidebar cũng đổi được.
 - Teal của theme sáng chỉ dùng làm nền; chữ hoặc icon màu accent nằm trên card thì dùng `accentInk(t)` (teal đậm hơn ở theme sáng).
@@ -43,7 +46,8 @@ go vet ./... && go test ./...
 - `Workspace.Move` từ chối (trả `false`, không đổi gì) khi thả một node vào chính nó, vào node con của nó, hoặc thả `Into` một request.
 - Không sửa cây trong lúc Outline đang build row (menu, phím tắt): gán vào `later` rồi chạy sau khi Outline build xong.
 - Folder rỗng phải trả về slice rỗng khác nil từ hàm `children`, nếu không Outline coi nó là leaf.
-- Muốn chọn một node mới tạo: gán `a.selectID`, frame sau mới tìm được row index của nó.
+- Muốn chọn một node mới tạo: gán `a.selectID`, frame sau mới tìm được row index của nó (và cuộn tới dòng đó).
+- Enter trên dòng là đổi tên. Outline tự nhận Enter và báo qua `Submitted()`, nhưng double click cũng báo qua đó, nên `ObserveInput` của Outline ghi lại `a.enterKey` để phân biệt. Cờ này phải là field của `app`: callback chạy trước khi frame build, nên vẫn là closure của frame trước. ⌘↓ mở request.
 - `EditableText` không mở chế độ sửa từ code được, nên đổi tên dùng `TextInputBase` riêng (`renameInput`): `AutoFocus`, gọi `SetTextSelection` cho đến khi đã focus (để gõ là thay cả tên cũ), commit khi Enter hoặc mất focus, Esc thì huỷ.
 
 ### Tab và gửi request
@@ -52,7 +56,7 @@ go vet ./... && go test ./...
 - Body response được format trong goroutine gửi request, không làm trên main thread. Lớn hơn `bigBody` (2 MB) thì hiện y nguyên như nhận được: không format, không tô màu, không soft wrap. Ở nhánh đó phải xét `!big` trước khi gọi `resp.JSON()`, vì `json.Valid` sẽ quét toàn bộ body.
 - Sửa model ở đâu cũng phải `a.changed()`, kể cả Select/URL (`Changed()`). `changed()` còn đóng tab của request đã bị xoá (`pruneTabs`).
 - Phím tắt: ⌘N / ⇧⌘N (tạo mới tại vị trí đang chọn ở sidebar), ⌘1…⌘9 (⌘9 là tab cuối), ⌘L (focus ô URL, chỉ khi đang có tab). Các phím này nằm trong `a.shortcuts`. ⌘N / ⇧⌘N có cả trong menu File: trên app thật thì menu nhận phím trước, view không thấy, nên không bị tạo hai lần; còn trong test không có menu thì view xử lý.
-- Menu mặc định của macOS gắn ⌘W cho Close Window. App tự `SetMenu` để ⌘W là Close Tab, còn Close Window chuyển sang ⇧⌘W. Muốn thêm phím tắt cấp app thì sửa menu này.
+- Menu mặc định của macOS gắn ⌘W cho Close Window. App tự `SetMenu` để ⌘W là Close Tab, còn Close Window chuyển sang ⇧⌘W. Muốn thêm phím tắt cấp app thì sửa menu này. Menu app được liệt kê tay (không dùng mục mặc định của `RoleAppMenu`) để chèn Settings… ⌘,.
 
 ### Params, Path, bảng key/value
 - `Request.URL` giữ nguyên chữ người dùng gõ, có cả các query đang bật; `Query` giữ thêm các dòng đã tắt (URL không thể hiện được). Sửa URL thì `QueryFromURL` + `PathFromURL`; sửa bảng Params thì `URLFromQuery`. Không escape gì trong model, chỉ escape lúc gửi (`httpx.ResolveURL`), nên `{{var}}` và chữ có dấu cách vẫn hiện y như gõ.
@@ -104,7 +108,7 @@ go vet ./... && go test ./...
 - Secret trong file: `store.Sealer` mã hoá bằng AES-GCM (`enc:v1:…`), khoá 32 byte nằm trong Keychain (`mygo.Secrets`, tên `workspace-key`). Không lưu từng secret vào Keychain, vì mỗi mục tối đa 2560 byte. Các field được mã hoá liệt kê trong hàm `secrets()`; thêm field nhạy cảm mới thì thêm vào đó.
 - Không lấy được khoá thì sealer là `nil`: giá trị đã mã hoá được giữ nguyên và `Load` đếm vào `locked` (app báo bằng toast), giá trị mới thì lưu chữ thường. Đừng xoá hay ghi đè các chuỗi `enc:v1:` mà mình không giải mã được.
 - Header (như `Authorization` tự gõ tay) và file export không được mã hoá; export cố ý xuất chữ thường để mang sang máy khác dùng được.
-- `go run .` và `mygo dev` dùng service Keychain khác nhau (tên app và `<identifier>.dev`), nên mỗi bản có khoá riêng và không đọc được secret của bản kia; lúc đó app báo "Couldn't unlock…".
+- Mặc định `mygo.Secrets` dùng service khác nhau cho `go run .` (tên app), `mygo dev` (`<identifier>.dev`) và bản build (identifier), nên trước đây mỗi bản có khoá riêng và file bị trộn secret của nhiều khoá. Giờ mọi bản dùng chung `keyService`. Khoá ở các service cũ (`oldKeyServices`) chỉ được đọc khi có secret mà khoá chung không mở được: đọc item Keychain của app khác có thể bị macOS hỏi quyền, nên không đọc lúc nào cũng được. Secret nào mở bằng khoá cũ thì `Sealer.Stale()` báo, app `touch()` để lần ghi kế tiếp mã hoá lại bằng khoá chung. Bản ký ad-hoc đổi chữ ký mỗi lần build, nên macOS có thể hỏi lại quyền đọc Keychain (chọn Always Allow).
 - `store.Load` lỗi thì app `log.Fatal` là cố ý: mở app với workspace trống thì lần sửa đầu tiên sẽ ghi đè mất file cũ.
 
 ### Test

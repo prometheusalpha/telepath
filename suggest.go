@@ -156,9 +156,9 @@ func (a *app) suggestVars(c *ui.Context, in ui.Element, value *string, label str
 						row.Background(t.SurfaceHover)
 					}
 					row.Children(func() {
-						ui.Text(c, name).Font(mono).FontSize(12).SingleLine()
+						ui.Text(c, name).Font(mono).FontFeatures(monoFeatures).FontSize(12).SingleLine()
 						ui.Spacer(c)
-						v := ui.Text(c, a.varPreview(name)).Font(mono).FontSize(11).SingleLine().MinWidth(0).Shrink(1)
+						v := ui.Text(c, a.varPreview(name)).Font(mono).FontFeatures(monoFeatures).FontSize(11).SingleLine().MinWidth(0).Shrink(1)
 						if i != s.sel {
 							v.TextColor(t.TextMuted)
 						}

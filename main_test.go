@@ -238,3 +238,64 @@ func TestShortcuts(t *testing.T) {
 		t.Errorf("⌘L didn't focus the URL: %q", got)
 	}
 }
+
+func TestEnterRenames(t *testing.T) {
+	ws := &model.Workspace{}
+	n := model.NewRequest("ping")
+	ws.Add(n, "")
+	a := newApp(ws, "")
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("ping")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.renaming != n.ID {
+		t.Fatal("Enter on the chosen row doesn't rename it")
+	}
+	tt.Type("pong")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if n.Name != "pong" || a.renaming != "" {
+		t.Fatalf("name %q, renaming %q", n.Name, a.renaming)
+	}
+	// The Enter that ends the rename doesn't start another.
+	tt.Frame()
+	if a.renaming != "" {
+		t.Error("renaming again after Enter")
+	}
+	a.closeTab(0)
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyDown)
+	tt.Frame()
+	if len(a.tabs) != 1 {
+		t.Errorf("⌘↓ doesn't open the request: %d tabs", len(a.tabs))
+	}
+}
+
+func TestRevealCurrent(t *testing.T) {
+	ws := &model.Workspace{}
+	f := model.NewFolder("Users")
+	ws.Add(f, "")
+	n := model.NewRequest("list")
+	ws.Add(n, f.ID)
+	ws.Add(model.NewRequest("other"), "")
+	f.Folder.Open = false
+	a := newApp(ws, "")
+	tt := ui.NewTester(a.view, 1200, 780)
+	if tt.HasText("Reveal Current Request") {
+		t.Error("the button shows with no tab open")
+	}
+	a.openTab(n.ID)
+	tt.Click("other")
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.Key1)
+	tt.Frame()
+	if err := tt.Click("Reveal Current Request"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	if !a.files.Open.Has(f.ID) || a.selected != n.ID {
+		t.Errorf("open %v, chosen %q", a.files.Open.Has(f.ID), a.selected)
+	}
+}

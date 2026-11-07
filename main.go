@@ -33,6 +33,9 @@ type app struct {
 	envOpen  bool
 	envDraft model.KV
 
+	settingsOpen bool
+	monoFamilies []string // the code fonts settings offer, once they opened
+
 	suggest    suggestion // the variables listed under the input typed in
 	dismissed  dismissal
 	suggested  string // the input a variable was put in between frames
@@ -60,6 +63,7 @@ type app struct {
 	selectID string // a node to choose once the outline has its row
 
 	press    press    // the row a press began on, to tell a click from a drag
+	enterKey bool     // Enter went to the outline since the last frame
 	dropHint dropHint // where a drag over the sidebar would drop, last frame
 	dropNext dropHint // and this frame
 
@@ -123,6 +127,7 @@ func newApp(ws *model.Workspace, path string) *app {
 	})
 	a.reindex()
 	a.env = vars.NewEnv(a.ws.Env)
+	setMono(ws)
 	return a
 }
 
@@ -229,6 +234,7 @@ func (a *app) view(c *ui.Context) {
 	ui.Split(c, &a.sidebarWidth, func() { a.sidebar(c) }, func() { a.content(c) }).
 		SplitReset(240).Fill()
 	a.envModal(c)
+	a.settingsModal(c)
 	a.searchModal(c)
 	a.curlModal(c)
 	if a.toast != "" {
@@ -291,18 +297,28 @@ func (a *app) content(c *ui.Context) {
 	})
 }
 
-// keychain is the system's credential store as the sealer reads its key.
-type keychain struct{}
+// keyService is where the key lives in the credential store, whichever
+// way the app runs: the default service is the name under `go run`, and
+// "<identifier>.dev" under `mygo dev`, so each got a key of its own and
+// couldn't read the secrets the others sealed in the same file. Those
+// keys stay readable through oldKeyServices, until their secrets are
+// sealed again.
+const keyService = "io.starchaser.telepath"
 
-func (keychain) Get(name string) ([]byte, bool, error) {
-	v, err := mygo.Secrets.Get(name)
+var oldKeyServices = []string{"telepath", "io.starchaser.telepath.dev"}
+
+// keychain is the system's credential store as the sealer reads its key.
+type keychain struct{ secrets mygo.SecretsModule }
+
+func (k keychain) Get(name string) ([]byte, bool, error) {
+	v, err := k.secrets.Get(name)
 	if errors.Is(err, mygo.ErrSecretNotFound) {
 		return nil, false, nil
 	}
 	return v, err == nil, err
 }
 
-func (keychain) Set(name string, v []byte) error { return mygo.Secrets.Set(name, v) }
+func (k keychain) Set(name string, v []byte) error { return k.secrets.Set(name, v) }
 
 func themeSource(theme string) mygo.ThemeSource {
 	switch theme {
@@ -323,7 +339,11 @@ func main() {
 		path := filepath.Join(dir, "workspace.json")
 		// Without the credential store, secrets stay as they are in the
 		// file: those sealed before stay sealed, new ones go in the clear.
-		sealer, sealErr := store.NewSealer(keychain{})
+		var old []store.Keyring
+		for _, svc := range oldKeyServices {
+			old = append(old, keychain{mygo.Secrets.Service(svc)})
+		}
+		sealer, sealErr := store.NewSealer(keychain{mygo.Secrets.Service(keyService)}, old...)
 		if sealErr != nil {
 			log.Printf("secrets saved unencrypted: %v", sealErr)
 		}
@@ -335,6 +355,10 @@ func main() {
 		a := newApp(ws, path)
 		a.sealer = sealer
 		a.restore(store.LoadSession(a.sessionPath))
+		if sealer.Stale() {
+			// Sealed again with the one key at the first save.
+			a.touch()
+		}
 		switch {
 		case locked > 0:
 			a.toast = fmt.Sprintf("Couldn't unlock %d saved secrets: the Keychain didn't give Telepath its key", locked)
@@ -353,7 +377,21 @@ func main() {
 		}
 		// The default menu's Close Window would take ⌘W from the tabs.
 		menu := mygo.NewMenu([]*mygo.MenuItem{
-			{Role: mygo.RoleAppMenu},
+			{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{
+				{Role: mygo.RoleAbout},
+				mygo.Separator(),
+				{Label: "Settings…", Accelerator: "CmdOrCtrl+,", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(a.openSettings)
+				}},
+				mygo.Separator(),
+				{Role: mygo.RoleServices},
+				mygo.Separator(),
+				{Role: mygo.RoleHide},
+				{Role: mygo.RoleHideOthers},
+				{Role: mygo.RoleUnhide},
+				mygo.Separator(),
+				{Role: mygo.RoleQuit},
+			}},
 			{Label: "File", Submenu: []*mygo.MenuItem{
 				{Label: "New Request", Accelerator: "CmdOrCtrl+N", Click: func(*mygo.MenuItem, *mygo.Window) {
 					win.Update(func() { a.newNode(model.NewRequest("New Request")) })

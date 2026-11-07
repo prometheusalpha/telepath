@@ -51,6 +51,9 @@ func (a *app) sidebar(c *ui.Context) {
 		ui.Row(c).Height(max(bar.Height, titleBarHeight)).Shrink(0).AlignItems(ui.Center).
 			Padding(0, 10, 0, bar.Left+10).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
+			if tb := a.current(); tb != nil && iconButton(c, locateIcon, "Reveal Current Request").Clicked() {
+				a.reveal(tb.id)
+			}
 			if iconButton(c, searchIcon, "Search").Tooltip("Search ⌘K").Clicked() {
 				a.openSearch()
 			}
@@ -100,6 +103,7 @@ func (a *app) outline(c *ui.Context) {
 		for i := range a.files.Rows() {
 			if a.files.Item(i) == a.selectID {
 				a.row, a.selectID = i, ""
+				a.files.List.ScrollIntoView(i)
 				break
 			}
 		}
@@ -127,6 +131,9 @@ func (a *app) outline(c *ui.Context) {
 	if c.Vibrancy() {
 		out.Background(ui.Transparent)
 	}
+	out.ObserveInput(func(ev ui.InputEvent) {
+		a.enterKey = a.enterKey || ev.Kind == ui.InputKeyDown && ev.Key == ui.KeyEnter
+	})
 	out.Children(func() {
 		if len(a.tree.roots) == 0 {
 			emptyState(c, "No requests yet", "Create one with +")
@@ -142,15 +149,19 @@ func (a *app) outline(c *ui.Context) {
 		a.selected = a.files.Item(a.row)
 	}
 	if n := a.tree.byID[a.selected]; n != nil && a.renaming == "" {
+		// Enter renames, as in Finder, and ⌘↓ opens; a click opens too. The
+		// outline takes Enter itself and reports it as Submitted, as it
+		// does a double click, which the row's own clicks handle.
 		switch {
-		case out.Submitted() && n.Request != nil:
-			a.openTab(n.ID)
-		case a.files.List.Shortcut(c, 0, ui.KeyF2):
+		case out.Submitted() && a.enterKey, a.files.List.Shortcut(c, 0, ui.KeyF2):
 			a.startRename(n)
+		case a.files.List.Shortcut(c, ui.Cmd, ui.KeyDown) && n.Request != nil:
+			a.openTab(n.ID)
 		case a.files.List.Shortcut(c, ui.Cmd, ui.KeyBackspace):
 			a.confirmDelete(n)
 		}
 	}
+	a.enterKey = false
 	if later != nil {
 		later()
 	}

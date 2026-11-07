@@ -15,6 +15,11 @@ type Workspace struct {
 	Items   []*Node `json:"items"`
 	Env     []KV    `json:"env,omitempty"`   // the one set of variables
 	Theme   string  `json:"theme,omitempty"` // ThemeSystem, ThemeLight or ThemeDark
+	// MonoFont is the family of code, URLs and key/value text, "" the one
+	// the app brings; MonoSize the size of the request and response
+	// bodies, 0 the default.
+	MonoFont string  `json:"monoFont,omitempty"`
+	MonoSize float32 `json:"monoSize,omitempty"`
 }
 
 const (

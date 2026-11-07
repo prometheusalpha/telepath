@@ -43,6 +43,9 @@ func (a *app) sidebarFooter(c *ui.Context) {
 		if footerButton(c, braceIcon, "Variables", count).Tooltip("⌘E").Clicked() {
 			a.envOpen = true
 		}
+		if footerButton(c, gearIcon, "Settings", "").Tooltip("⌘,").Clicked() {
+			a.openSettings()
+		}
 	})
 }
 

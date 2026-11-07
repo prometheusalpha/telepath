@@ -142,7 +142,7 @@ func (a *app) curlModal(c *ui.Context) {
 		ui.Column(c).Width(min(640, w-80)).Gap(8).Children(func() {
 			ui.Text(c, "Import cURL").FontSize(16).FontWeight(600)
 			ui.Text(c, "Paste a curl command, as a browser's Copy as cURL makes.").FontSize(12).TextColor(t.TextMuted)
-			ui.TextArea(c, &a.curlText).Lines(6, 14).Font(mono).FontSize(12).AutoFocus().
+			ui.TextArea(c, &a.curlText).Lines(6, 14).Font(mono).FontFeatures(monoFeatures).FontSize(12).AutoFocus().
 				Placeholder("curl https://api.example.com/users -H 'Accept: application/json'").Label("cURL command")
 			if a.curlErr != "" {
 				ui.Text(c, a.curlErr).FontSize(12).TextColor(t.Danger)

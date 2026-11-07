@@ -232,7 +232,7 @@ func (a *app) searchRow(c *ui.Context, h hit, sel bool) ui.Element {
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Text(c, n.Name).SingleLine()
 			if n.Request != nil && n.Request.URL != "" {
-				url := ui.Text(c, n.Request.URL).Font(mono).FontSize(11).SingleLine()
+				url := ui.Text(c, n.Request.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).SingleLine()
 				if !sel {
 					url.TextColor(t.TextMuted)
 				}

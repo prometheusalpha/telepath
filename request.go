@@ -110,12 +110,12 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		a.send(tb)
 	}
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(10, 12).Shrink(0).Children(func() {
-		m := ui.Select(c, &r.Method, methods).Width(104).Font(mono).FontWeight(700).
+		m := ui.Select(c, &r.Method, methods).Width(104).Font(mono).FontFeatures(monoFeatures).FontWeight(700).
 			TextColor(methodColor(t, r.Method)).Label("Method")
 		if m.Changed() {
 			a.changed()
 		}
-		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).
+		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).
 			Placeholder("{{base}}/users").Label("URL").Bind(&a.urlHandle)
 		if a.highlightVars(c, url, r.URL) {
 			url.Tooltip(a.env.Expand(r.URL, nil))
@@ -191,7 +191,7 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 		case tb.err != nil:
 			ui.Column(c).Grow(1).Center().Gap(6).Padding(24).Children(func() {
 				ui.Text(c, "Couldn't send the request").FontWeight(600).TextColor(t.Danger)
-				ui.Text(c, tb.err.Error()).FontSize(12).Font(mono).TextColor(t.TextMuted).Selectable()
+				ui.Text(c, tb.err.Error()).FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted).Selectable()
 			})
 		case tb.resp == nil:
 			emptyState(c, "No response yet", "Press Send, or ⌘↵")
@@ -217,7 +217,7 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 	t := c.Theme()
 	resp := tb.resp
 	ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(6, 12).Shrink(0).Children(func() {
-		ui.Text(c, resp.Status).Font(mono).FontWeight(700).FontSize(12).TextColor(statusColor(t, resp.StatusCode))
+		ui.Text(c, resp.Status).Font(mono).FontFeatures(monoFeatures).FontWeight(700).FontSize(12).TextColor(statusColor(t, resp.StatusCode))
 		ui.Text(c, httpx.FormatDuration(resp.Duration)).FontSize(12).TextColor(t.TextMuted)
 		size := httpx.FormatSize(resp.Size)
 		if resp.Truncated {
@@ -225,7 +225,7 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		}
 		ui.Text(c, size).FontSize(12).TextColor(t.TextMuted)
 		// Where it went, variables and path parameters filled in.
-		ui.Text(c, resp.URL).Font(mono).FontSize(11).TextColor(t.TextMuted).SingleLine().
+		ui.Text(c, resp.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
 		if iconButton(c, copyIcon, "Copy body").Clicked() {
 			c.Services().WriteClipboard(tb.body.Buffer.String())
@@ -253,15 +253,16 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 			emptyState(c, "Empty body", "")
 			return
 		}
+		styleCode(c, tb.body)
 		editor.View(c, tb.body).Grow(1).FillWidth().Label("Response body")
 	case 1:
 		cols := []ui.TableColumn{{Title: "Name", Width: 220}, {Title: "Value"}}
 		ui.Table(c, nil, cols, len(resp.Headers), func(row, col int) {
 			h := resp.Headers[row]
 			if col == 0 {
-				ui.Text(c, h.Key).Font(mono).FontSize(12).SingleLine()
+				ui.Text(c, h.Key).Font(mono).FontFeatures(monoFeatures).FontSize(12).SingleLine()
 			} else {
-				ui.Text(c, h.Value).Font(mono).FontSize(12).Selectable()
+				ui.Text(c, h.Value).Font(mono).FontFeatures(monoFeatures).FontSize(12).Selectable()
 			}
 		}).Grow(1)
 	}
@@ -350,6 +351,7 @@ func (a *app) bodyPane(c *ui.Context, tb *tab, r *model.Request) {
 		ui.Text(c, "This request has no body.").FontSize(12).TextColor(t.TextMuted).Padding(4, 12)
 	case model.BodyJSON, model.BodyText:
 		st := a.bodyEditor(tb, r)
+		styleCode(c, st)
 		editor.View(c, st).Height(260).FillWidth().Label("Request body")
 		if text := st.Buffer.String(); text != r.Body.Text {
 			r.Body.Text = text
@@ -408,7 +410,7 @@ func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
 	field := func(label string, value *string, secret bool) ui.Element {
 		return ui.Field(c, label, func() {
 			ui.Row(c).Gap(8).AlignItems(ui.Center).MaxWidth(560).Children(func() {
-				in := ui.TextInput(c, value).Grow(1).MinWidth(0).Font(mono).FontSize(12)
+				in := ui.TextInput(c, value).Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).FontSize(12)
 				if secret && !tb.reveal {
 					in.Password()
 				}

@@ -43,7 +43,7 @@ func (a *app) kvTable(c *ui.Context, rows *[]model.KV, draft *model.KV, o kvOpti
 					// Columns line up with the other tables': the checkbox's
 					// room, then the key where its input would be.
 					ui.Box(c).Size(t.Space(4), t.Space(4)).Shrink(0)
-					ui.Text(c, kv.Key).Font(mono).FontSize(12).Grow(1).MinWidth(0).Padding(0, 11).SingleLine()
+					ui.Text(c, kv.Key).Font(mono).FontFeatures(monoFeatures).FontSize(12).Grow(1).MinWidth(0).Padding(0, 11).SingleLine()
 				} else {
 					if ui.Checkbox(c, &kv.Enabled, "").Label(fmt.Sprintf("%s %d enabled", o.name, i+1)).Changed() {
 						changed = true
@@ -118,7 +118,7 @@ func (a *app) keyInput(c *ui.Context, key *string, label string, muted bool, o k
 	} else {
 		in = ui.TextInput(c, key)
 	}
-	in.Grow(1).MinWidth(0).Font(mono).FontSize(12).Placeholder("Key").Label(label)
+	in.Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).FontSize(12).Placeholder("Key").Label(label)
 	if muted {
 		in.TextColor(c.Theme().TextMuted)
 	} else if !o.secrets {
@@ -153,7 +153,7 @@ func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, 
 		}
 		return changed
 	}
-	in := ui.TextInput(c, &kv.Value).Grow(2).MinWidth(0).Font(mono).FontSize(12).Placeholder("Value").Label(label)
+	in := ui.TextInput(c, &kv.Value).Grow(2).MinWidth(0).Font(mono).FontFeatures(monoFeatures).FontSize(12).Placeholder("Value").Label(label)
 	switch {
 	case kv.Secret:
 		in.Password()

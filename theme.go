@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 
 	"telepath/internal/model"
 )
@@ -11,9 +12,41 @@ import (
 var (
 	lightTheme = newTheme(ui.LightTheme())
 	darkTheme  = newTheme(ui.DarkTheme())
+	lightCode  = newCodeTheme(lightTheme)
+	darkCode   = newCodeTheme(darkTheme)
 )
 
-const mono = "monospace"
+// mono is the family of code, URLs and key/value text, monoFeatures the
+// OpenType features it shows with, and codeSize the size of the request
+// and response bodies. Like the themes they are read
+// everywhere, so setMono changes them in place rather than passing them
+// down.
+var (
+	mono         = builtinMono + ", monospace"
+	monoFeatures = builtinFeatures
+	codeSize     = defaultCodeSize
+)
+
+// builtinFeatures are those of the user's Ghostty config, for JetBrains
+// Mono alone: the stylistic sets of another family mean other glyphs.
+const builtinFeatures = "ss01,ss02,ss03,ss04,ss05,ss06,ss07,ss08,calt,cv09,dlig,pnum,lnum,case"
+
+const defaultCodeSize float32 = 13
+
+// setMono applies the workspace's font settings; "" and 0 are the
+// defaults. The system's monospaced font follows, for what a chosen family
+// lacks.
+func setMono(ws *model.Workspace) {
+	mono, monoFeatures = builtinMono, builtinFeatures
+	if ws.MonoFont != "" {
+		mono, monoFeatures = ws.MonoFont+", "+builtinMono, ""
+	}
+	mono += ", monospace"
+	codeSize = defaultCodeSize
+	if ws.MonoSize > 0 {
+		codeSize = ws.MonoSize
+	}
+}
 
 func newTheme(t *ui.Theme) *ui.Theme {
 	// Teal is light enough that white text on it reads poorly in either
@@ -72,6 +105,38 @@ func themeOf(theme string) themeChoice {
 		}
 	}
 	return themes[0]
+}
+
+// newCodeTheme gives each kind of JSON token a hue of its own: the
+// editor's default has keys, numbers and true/false/null in one blue, and
+// strings in a paler one.
+func newCodeTheme(t *ui.Theme) *editor.Theme {
+	ct := editor.DefaultTheme(t)
+	l, c := float32(0.5), float32(0.14)
+	if t.Dark {
+		l, c = 0.8, 0.11
+	}
+	tok := func(k editor.TokenKind, color ui.Color) { ct.Tokens[k] = editor.TokenStyle{Color: color} }
+	tok(editor.TokenProperty, ui.Oklch(l, c, 250))
+	tok(editor.TokenString, ui.Oklch(l, c, 145))
+	tok(editor.TokenNumber, ui.Oklch(l, c, 55))
+	tok(editor.TokenConstant, ui.Oklch(l, c, 310))
+	tok(editor.TokenKeyword, ui.Oklch(l, c, 310))
+	tok(editor.TokenEscape, ui.Oklch(l, c, 200))
+	tok(editor.TokenOperator, t.TextMuted)
+	tok(editor.TokenPunctuation, t.TextMuted)
+	ct.Cursor = accentInk(t)
+	return ct
+}
+
+// styleCode gives an editor the theme of the window's appearance and the
+// font of the settings, every frame, as both can change.
+func styleCode(c *ui.Context, st *editor.State) {
+	st.Theme = lightCode
+	if c.Theme().Dark {
+		st.Theme = darkCode
+	}
+	st.Font = ui.Font{Family: mono, Size: codeSize, Features: monoFeatures}
 }
 
 func applyTheme(c *ui.Context) {

@@ -15,6 +15,7 @@ var (
 	splitRightIcon = icon(`<rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M8.5 2.5v11"/>`)
 	splitBelowIcon = icon(`<rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M1.5 8.5h13"/>`)
 	sendIcon       = icon(`<path d="M2.5 8h10M9 4.5L12.5 8 9 11.5"/>`)
+	locateIcon     = icon(`<circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/>`)
 )
 
 // methodBadge shortens the long methods so badges keep one width in the
@@ -30,7 +31,7 @@ func methodBadge(c *ui.Context, method string) ui.Element {
 		label = "PAT"
 	}
 	t := c.Theme()
-	return ui.Text(c, label).Font(mono).FontSize(10).FontWeight(700).
+	return ui.Text(c, label).Font(mono).FontFeatures(monoFeatures).FontSize(10).FontWeight(700).
 		TextColor(methodColor(t, method)).Width(28).SingleLine()
 }
 
