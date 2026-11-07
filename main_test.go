@@ -164,3 +164,32 @@ func TestFolderMenuKeepsItClosed(t *testing.T) {
 		t.Error("opening the folder's menu opens the folder")
 	}
 }
+
+func TestSessionComesBack(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workspace.json")
+	ws := &model.Workspace{}
+	one, two := model.NewRequest("one"), model.NewRequest("two")
+	ws.Add(one, "")
+	ws.Add(two, "")
+	a := newApp(ws, path)
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("one")
+	tt.Frame()
+	tt.Click("two")
+	tt.Frame()
+	a.sidebarWidth, a.split = 310, 62
+	tt.Advance(saveDelay + 100*time.Millisecond)
+
+	ws2, err := store.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A request gone since, as if deleted in another copy of the file.
+	ws2.Remove(one.ID)
+	b := newApp(ws2, path)
+	b.restore(store.LoadSession(b.sessionPath))
+	if len(b.tabs) != 1 || b.tabs[0].id != two.ID || b.active != 0 || b.sidebarWidth != 310 || b.split != 62 || b.dirty {
+		t.Errorf("restored tabs %d, active %d, widths %v %v, dirty %v", len(b.tabs), b.active, b.sidebarWidth, b.split, b.dirty)
+	}
+}

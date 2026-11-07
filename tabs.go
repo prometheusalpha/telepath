@@ -15,6 +15,7 @@ func (a *app) openTab(id string) {
 	}
 	a.recent = slices.Insert(slices.DeleteFunc(a.recent, func(r string) bool { return r == id }), 0, id)
 	a.recent = a.recent[:min(len(a.recent), 10)]
+	a.touch()
 	if i := slices.IndexFunc(a.tabs, func(t *tab) bool { return t.id == id }); i >= 0 {
 		a.active = i
 		return
@@ -33,6 +34,7 @@ func (a *app) closeTab(i int) {
 	}
 	a.tabs[i].stop()
 	a.tabs = slices.Delete(a.tabs, i, i+1)
+	a.touch()
 	if a.active >= i && a.active > 0 {
 		a.active--
 	}
@@ -90,6 +92,7 @@ func (a *app) tabBar(c *ui.Context) {
 			})
 			if pill.Clicked() {
 				a.active = i
+				a.touch()
 			}
 		}
 	})

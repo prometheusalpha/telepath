@@ -21,10 +21,11 @@ const (
 )
 
 type app struct {
-	ws   *model.Workspace
-	path string // "" keeps the workspace in memory, as tests do
-	tree tree
-	env  vars.Env // ws.Env, looked up as the views build
+	ws          *model.Workspace
+	path        string // "" keeps the workspace in memory, as tests do
+	sessionPath string
+	tree        tree
+	env         vars.Env // ws.Env, looked up as the views build
 
 	envOpen  bool
 	envDraft model.KV
@@ -93,6 +94,9 @@ func newApp(ws *model.Workspace, path string) *app {
 		openFile: func(func(string, []byte)) {},
 		saveFile: func(string, []byte, func(error)) {},
 	}
+	if path != "" {
+		a.sessionPath = filepath.Join(filepath.Dir(path), "session.json")
+	}
 	a.ws.Walk(func(n, _ *model.Node) bool {
 		if n.Folder != nil && n.Folder.Open {
 			a.files.Open.Add(n.ID)
@@ -102,6 +106,37 @@ func newApp(ws *model.Workspace, path string) *app {
 	a.reindex()
 	a.env = vars.NewEnv(a.ws.Env)
 	return a
+}
+
+// touch marks the session, as tabs opening and closing, for saving with
+// the workspace.
+func (a *app) touch() {
+	a.dirty, a.saveAt = true, time.Time{}
+}
+
+func (a *app) session() store.Session {
+	s := store.Session{Active: a.active, SidebarWidth: a.sidebarWidth, Split: a.split}
+	for _, tb := range a.tabs {
+		s.Tabs = append(s.Tabs, tb.id)
+	}
+	return s
+}
+
+// restore reopens the tabs of a session whose requests are still there.
+func (a *app) restore(s store.Session) {
+	for _, id := range s.Tabs {
+		a.openTab(id)
+	}
+	if s.Active >= 0 && s.Active < len(a.tabs) {
+		a.active = s.Active
+	}
+	if s.SidebarWidth > 0 {
+		a.sidebarWidth = s.SidebarWidth
+	}
+	if s.Split > 0 {
+		a.split = s.Split
+	}
+	a.dirty = false
 }
 
 // changed marks the workspace for saving and pushes the save back, so a
@@ -127,6 +162,9 @@ func (a *app) flush() error {
 		return true
 	})
 	if err := store.Save(a.path, a.ws); err != nil {
+		return err
+	}
+	if err := store.SaveSession(a.sessionPath, a.session()); err != nil {
 		return err
 	}
 	a.dirty = false
@@ -223,6 +261,7 @@ func main() {
 			log.Fatalf("reading %s: %v", path, err)
 		}
 		a := newApp(ws, path)
+		a.restore(store.LoadSession(a.sessionPath))
 		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 			if err := a.flush(); err != nil {
 				log.Print(err)

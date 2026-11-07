@@ -28,3 +28,17 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("loaded %+v", got.Items)
 	}
 }
+
+func TestSession(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.json")
+	if s := LoadSession(path); len(s.Tabs) != 0 {
+		t.Fatalf("missing file: %+v", s)
+	}
+	want := Session{Tabs: []string{"a", "b"}, Active: 1, SidebarWidth: 300, Split: 60}
+	if err := SaveSession(path, want); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadSession(path); got.Active != 1 || len(got.Tabs) != 2 || got.SidebarWidth != 300 || got.Split != 60 {
+		t.Errorf("loaded %+v", got)
+	}
+}

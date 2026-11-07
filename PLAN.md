@@ -202,6 +202,10 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Lưu password/token/API key (Auth) và biến secret vào Keychain qua module `secrets` của MyGo, thay vì plain text trong `workspace.json`.
 - Đóng gói bằng `mygo` CLI, icon app.
 
+## Phase 10
+- Enter khi select -> rename tên request
+- Đp
+
 ---
 
 ## Quyết định đã chốt
