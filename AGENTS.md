@@ -48,6 +48,7 @@ go vet ./... && go test ./...
 - Không sửa cây trong lúc Outline đang build row (menu, phím tắt): gán vào `later` rồi chạy sau khi Outline build xong.
 - Folder rỗng phải trả về slice rỗng khác nil từ hàm `children`, nếu không Outline coi nó là leaf.
 - Muốn chọn một node mới tạo: gán `a.selectID`, frame sau mới tìm được row index của nó (và cuộn tới dòng đó).
+- Sidebar đi theo tab đang hiện: `view` so `a.current().id` với `a.followed`, khác thì `reveal` (mở folder cha, chọn, cuộn tới). Đổi tab bằng cách nào cũng đi qua đây, đừng gọi `reveal` riêng ở từng chỗ đổi `a.active`.
 - Enter trên dòng là đổi tên. Outline tự nhận Enter và báo qua `Submitted()`, nhưng double click cũng báo qua đó, nên `ObserveInput` của Outline ghi lại `a.enterKey` để phân biệt. Cờ này phải là field của `app`: callback chạy trước khi frame build, nên vẫn là closure của frame trước. ⌘↓ mở request.
 - `EditableText` không mở chế độ sửa từ code được, nên đổi tên dùng `TextInputBase` riêng (`renameInput`): `AutoFocus`, gọi `SetTextSelection` cho đến khi đã focus (để gõ là thay cả tên cũ), commit khi Enter hoặc mất focus, Esc thì huỷ.
 

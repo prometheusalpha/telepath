@@ -67,6 +67,7 @@ type app struct {
 	row      int
 	selected string
 	selectID string // a node to choose once the outline has its row
+	followed string // the tab the sidebar last turned to
 
 	press    press    // the row a press began on, to tell a click from a drag
 	enterKey bool     // Enter went to the outline since the last frame
@@ -236,6 +237,14 @@ func (a *app) view(c *ui.Context) {
 		c.Root().Background(ui.Transparent)
 	} else {
 		c.Root().Background(sidebarColor(t))
+	}
+	// The sidebar follows the tab shown, however it came to show: a click,
+	// the keys, a tab closing, a search.
+	if tb := a.current(); tb == nil {
+		a.followed = ""
+	} else if tb.id != a.followed {
+		a.followed = tb.id
+		a.reveal(tb.id)
 	}
 	ui.Split(c, &a.sidebarWidth, func() { a.sidebar(c) }, func() { a.content(c) }).
 		SplitReset(240).Fill()

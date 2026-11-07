@@ -46,3 +46,36 @@ func tabMenu(t *testing.T, tt *ui.Tester, name, item string) {
 	}
 	tt.Frame()
 }
+
+func TestSidebarFollowsTheTab(t *testing.T) {
+	ws := &model.Workspace{}
+	f := model.NewFolder("Users")
+	ws.Add(f, "")
+	n := model.NewRequest("list")
+	ws.Add(n, f.ID)
+	other := model.NewRequest("other")
+	ws.Add(other, "")
+	a := newApp(ws, "")
+	tt := ui.NewTester(a.view, 1200, 780)
+	a.openTab(n.ID)
+	a.openTab(other.ID)
+	tt.Frame()
+	tt.Frame()
+	if a.selected != other.ID {
+		t.Fatalf("chosen %q", a.selected)
+	}
+	a.files.Open.Remove(f.ID)
+	tt.Key(ui.Cmd, ui.Key1)
+	tt.Frame()
+	tt.Frame()
+	if !a.files.Open.Has(f.ID) || a.selected != n.ID {
+		t.Fatalf("after ⌘1, open %v, chosen %q", a.files.Open.Has(f.ID), a.selected)
+	}
+	// Closing it shows the other tab, and the sidebar goes there too.
+	tt.Key(ui.Cmd, ui.KeyW)
+	tt.Frame()
+	tt.Frame()
+	if a.selected != other.ID {
+		t.Errorf("after closing, chosen %q", a.selected)
+	}
+}
