@@ -7,7 +7,7 @@
 # again for the secrets' key after each one.
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 app=build/darwin-arm64/telepath.app
 dest=/Applications/telepath.app
 local_identity="Telepath Local Signing"

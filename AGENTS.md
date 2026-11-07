@@ -8,7 +8,7 @@ API client desktop nhỏ (sidebar cây folder/request, tab, editor request, mộ
 go run .                 # chạy app
 go tool mygo dev         # chạy app với live reload (build lại khi sửa Go)
 go tool mygo build       # build production vào build/darwin-arm64/telepath.app (ký ad-hoc; thêm -skip-dmg cho nhanh)
-scripts/install.sh       # build, ký, kiểm tra chữ ký rồi thay bản trong /Applications (mặc định ký bằng chứng chỉ tự ký `Telepath Local Signing` nếu Keychain có, không thì ad-hoc; SIGN_IDENTITY=… để chọn chứng chỉ khác; app đang chạy thì dừng, bảo quit trước)
+./install.sh             # build, ký, kiểm tra chữ ký rồi thay bản trong /Applications (mặc định ký bằng chứng chỉ tự ký `Telepath Local Signing` nếu Keychain có, không thì ad-hoc; SIGN_IDENTITY=… để chọn chứng chỉ khác; app đang chạy thì dừng, bảo quit trước)
 go vet ./... && go test ./...
 ```
 
