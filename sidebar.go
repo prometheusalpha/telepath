@@ -54,6 +54,18 @@ func (a *app) sidebar(c *ui.Context) {
 			if iconButton(c, searchIcon, "Search").Tooltip("Search ⌘K").Clicked() {
 				a.openSearch()
 			}
+			iconButton(c, moreIcon, "More").Menu(func(m *ui.Menu) {
+				if m.Item("Import Collection…").Shortcut(ui.Cmd, ui.KeyO).Chosen() {
+					a.importFile()
+				}
+				if m.Item("Import cURL…").Shortcut(ui.Cmd|ui.Shift, ui.KeyO).Chosen() {
+					a.openCurl()
+				}
+				m.Separator()
+				if m.Item("Export Collection…").Chosen() {
+					a.exportWorkspace()
+				}
+			})
 			iconButton(c, plusIcon, "New").Menu(func(m *ui.Menu) {
 				if m.Item("New Request").Chosen() {
 					a.create(model.NewRequest("New Request"), a.selected)
@@ -167,6 +179,12 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 		}
 		if m.Item("Rename").Shortcut(0, ui.KeyF2).Chosen() {
 			later = func() { a.startRename(n) }
+		}
+		if n.Request != nil && m.Item("Copy as cURL").Chosen() {
+			later = func() { a.copyCurl(c, n) }
+		}
+		if n.Folder != nil && m.Item("Export…").Chosen() {
+			later = func() { a.exportFolder(n) }
 		}
 		if m.Item("Duplicate").Chosen() {
 			later = func() {

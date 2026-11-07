@@ -1,0 +1,19 @@
+{
+  "info": {"name": "Acme", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]},
+  "event": [{"listen": "prerequest"}],
+  "variable": [{"key": "base", "value": "https://api.acme.dev"}],
+  "item": [
+    {"name": "Users", "item": [
+      {"name": "get user", "event": [{"listen": "test"}],
+       "request": {"method": "get", "header": [{"key": "Accept", "value": "application/json"}, {"key": "X-Off", "value": "1", "disabled": true}],
+         "url": {"raw": "{{base}}/users/:id?expand=roles", "query": [{"key": "expand", "value": "roles"}, {"key": "debug", "value": "1", "disabled": true}],
+                 "variable": [{"key": "id", "value": "7"}]}}},
+      {"name": "upload", "request": {"method": "POST", "url": "{{base}}/up",
+         "auth": {"type": "oauth2"},
+         "body": {"mode": "formdata", "formdata": [{"key": "title", "value": "x"}, {"key": "doc", "type": "file", "src": ["/tmp/a.pdf"]}]}}}
+    ]},
+    {"name": "login", "request": {"method": "POST", "url": "{{base}}/login", "auth": {"type": "basic", "basic": [{"key": "username", "value": "ada"}, {"key": "password", "value": "pw"}]},
+      "body": {"mode": "raw", "raw": "{\"remember\": true}", "options": {"raw": {"language": "json"}}}}}
+  ]
+}

@@ -21,8 +21,9 @@ go vet ./... && go test ./...
 - `internal/store`: đọc/ghi `workspace.json`, ghi qua file `.tmp` rồi rename.
 - `internal/model/url.go`: đồng bộ URL ↔ Query, nhận diện `:name` trong path.
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
+- `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
@@ -76,6 +77,14 @@ go vet ./... && go test ./...
 - `OnTextKey` có thể chạy giữa hai frame: nó đọc `a.hits` của frame trước, đừng tính lại kết quả bên trong đó.
 - `fuzzy` chấm điểm: ký tự liền nhau, đầu từ và đầu chuỗi được cộng thêm. Mỗi từ trong query phải khớp với tên (nhân 3), method (nhân 2), hoặc folder/URL (nhân 1). URL được thử cả bản gốc lẫn bản đã thay biến (`a.env.Expand`), nên gõ host vẫn khớp `{{base}}`; còn kết quả thì hiện URL gốc. Muốn chỉnh xếp hạng thì thêm case vào `TestFuzzyRanks`.
 - `tree.parent` (dựng trong `reindex`) dùng cho breadcrumb và `reveal` (mở các folder cha rồi chọn node ở sidebar). `a.recent` chỉ nằm trong bộ nhớ, tối đa 10 mục.
+
+### Import / export
+- Import luôn tạo một folder mới ở trên cùng (không thay thế gì đang có), node nhận ID mới (`fresh`). Biến đã có trong workspace thì giữ giá trị cũ và đếm vào toast, không hỏi.
+- Postman: auth của collection/folder được copy vào các request không có auth riêng (app không có kế thừa auth). Script và các kiểu auth app không hỗ trợ thì bị bỏ qua, có báo trong `Result.Skipped`.
+- Export folder chỉ kèm những biến mà request trong folder có dùng; export workspace kèm toàn bộ biến.
+- Copy as cURL thay biến trước, rồi `httpx.Build` sinh header (auth, Content-Type). Multipart thì dùng `-F` và không dựng body, để khỏi phải đọc file.
+- `ParseCurl` tách lệnh theo kiểu shell (`splitShell`, có hỗ trợ `$'…'` của Chrome). Flag không ảnh hưởng tới request thì bỏ qua; flag có kèm giá trị phải nằm trong `ignoredWithValue`, không thì giá trị đó bị coi là URL.
+- Dialog chạy trong goroutine (`a.openFile`, `a.saveFile`); kết quả về qua `win.Update`, thông báo đặt vào `a.toast` để frame sau hiện ra. `newApp` gán sẵn bản không làm gì cho các hook dialog, test thì thay bằng bản giả.
 
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.

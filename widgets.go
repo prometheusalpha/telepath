@@ -8,6 +8,7 @@ func icon(shapes string) *ui.SVG {
 
 var (
 	plusIcon   = icon(`<path d="M8 3v10M3 8h10"/>`)
+	moreIcon   = icon(`<circle cx="3.5" cy="8" r=".6" fill="currentColor"/><circle cx="8" cy="8" r=".6" fill="currentColor"/><circle cx="12.5" cy="8" r=".6" fill="currentColor"/>`)
 	searchIcon = icon(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/>`)
 	sendIcon   = icon(`<path d="M2.5 8h10M9 4.5L12.5 8 9 11.5"/>`)
 )

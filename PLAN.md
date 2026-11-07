@@ -185,8 +185,8 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 ## Phase 8 — Import / Export
 
 - **Native JSON:** export cả workspace hoặc một folder (`Dialog.Save`), import lại (`Dialog.Open`) → merge vào gốc dưới folder mới, không đè dữ liệu cũ.
-- **Postman Collection v2.1 import:** folder, request, query, header, body (raw/urlencoded/formdata), auth basic/bearer/apikey; biến collection gộp vào bộ biến duy nhất (hỏi nếu trùng key). Script/test bị bỏ qua và báo số lượng đã bỏ.
-- **cURL:** dán lệnh cURL → tạo request; context menu "Copy as cURL" (đã resolve biến hoặc chưa).
+- **Postman Collection v2.1 import:** folder, request, query, header, body (raw/urlencoded/formdata), auth basic/bearer/apikey; biến collection gộp vào bộ biến duy nhất (trùng key thì giữ giá trị cũ và báo trong toast, không hỏi). Auth của collection/folder được copy vào request. Script/test bị bỏ qua và báo số lượng đã bỏ.
+- **cURL:** dán lệnh cURL → tạo request; context menu "Copy as cURL" (đã thay biến).
 - Báo kết quả bằng toast: "Imported 12 requests, skipped 3 scripts".
 
 **Xong khi:** import được một collection Postman thật và gửi được request trong đó.
@@ -197,6 +197,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Khôi phục tab đang mở + tab active + kích thước split khi mở lại app.
 - Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌘L focus URL.
 - Response: nút copy body, lưu body ra file, cảnh báo/ cắt hiển thị khi response quá lớn.
+- Chọn vị trí khu response: bên dưới (như hiện tại) hoặc bên phải request (chia trái/phải). Có nút đổi nhanh trên thanh response + mục trong menu View, lưu lựa chọn; mỗi vị trí nhớ kích thước split riêng.
 - Gợi ý biến khi gõ `{{` trong ô URL và các ô của bảng (Params, Path, Headers, Body form, Auth): hiện danh sách biến kèm giá trị (che biến secret), lọc theo chữ đang gõ, Enter/Tab chèn `{{name}}`.
 - Lưu password/token/API key (Auth) và biến secret vào Keychain qua module `secrets` của MyGo, thay vì plain text trong `workspace.json`.
 - Đóng gói bằng `mygo` CLI, icon app.

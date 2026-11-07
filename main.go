@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -33,6 +34,13 @@ type app struct {
 	hits       []hit // what the search shows, for its keys between frames
 	searchSel  int
 	recent     []string // requests opened, the last first
+
+	curlOpen bool
+	curlText string
+	curlErr  string
+	// toast is a message for the next frame to show, from work that ends
+	// outside the view, as a file dialog's.
+	toast string
 
 	files    ui.OutlineState[string]
 	depth    int  // of the row being built, from the outline's Prefix
@@ -65,12 +73,22 @@ type app struct {
 	// pickFile asks for a file and gives its path to done, on the main
 	// thread, unless canceled.
 	pickFile func(done func(path string))
+	// openFile asks for a file and gives its name and contents to done;
+	// saveFile asks where to write data, writes it and reports to done.
+	// Both call back on the main thread, and not at all when canceled.
+	openFile func(done func(name string, data []byte))
+	saveFile func(name string, data []byte, done func(error))
 
 	sidebarWidth float32
 }
 
 func newApp(ws *model.Workspace, path string) *app {
-	a := &app{ws: ws, path: path, row: -1, active: -1, split: 45, client: &http.Client{}, sidebarWidth: 240}
+	a := &app{ws: ws, path: path, row: -1, active: -1, split: 45, client: &http.Client{}, sidebarWidth: 240,
+		// Without a window there are no dialogs: main and tests set these.
+		pickFile: func(func(string)) {},
+		openFile: func(func(string, []byte)) {},
+		saveFile: func(string, []byte, func(error)) {},
+	}
 	a.ws.Walk(func(n, _ *model.Node) bool {
 		if n.Folder != nil && n.Folder.Open {
 			a.files.Open.Add(n.ID)
@@ -147,6 +165,11 @@ func (a *app) view(c *ui.Context) {
 		SplitReset(240).Fill()
 	a.envModal(c)
 	a.searchModal(c)
+	a.curlModal(c)
+	if a.toast != "" {
+		c.Toast(a.toast)
+		a.toast = ""
+	}
 	a.autosave(c)
 }
 
@@ -215,6 +238,16 @@ func main() {
 				}},
 				{Label: "Close Window", Accelerator: "CmdOrCtrl+Shift+W", Role: mygo.RoleClose},
 				mygo.Separator(),
+				{Label: "Import Collection…", Accelerator: "CmdOrCtrl+O", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(a.importFile)
+				}},
+				{Label: "Import cURL…", Accelerator: "CmdOrCtrl+Shift+O", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(a.openCurl)
+				}},
+				{Label: "Export Collection…", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(a.exportWorkspace)
+				}},
+				mygo.Separator(),
 				{Label: "Search…", Accelerator: "CmdOrCtrl+K", Click: func(*mygo.MenuItem, *mygo.Window) {
 					win.Update(a.openSearch)
 				}},
@@ -256,6 +289,33 @@ func main() {
 			Content:        ui.View(a.view),
 		})
 		a.update = win.Update
+		jsonFiles := []mygo.FileFilter{{Name: "Collections", Extensions: []string{"json"}}}
+		a.openFile = func(done func(string, []byte)) {
+			go func() {
+				paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: win, Title: "Import", Filters: jsonFiles})
+				if err != nil || len(paths) == 0 {
+					return
+				}
+				data, err := os.ReadFile(paths[0])
+				win.Update(func() {
+					if err != nil {
+						a.toast = "Couldn't read " + filepath.Base(paths[0]) + ": " + err.Error()
+						return
+					}
+					done(filepath.Base(paths[0]), data)
+				})
+			}()
+		}
+		a.saveFile = func(name string, data []byte, done func(error)) {
+			go func() {
+				path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: win, Title: "Export", DefaultPath: name, Filters: jsonFiles})
+				if err != nil || path == "" {
+					return
+				}
+				err = os.WriteFile(path, data, 0o644)
+				win.Update(func() { done(err) })
+			}()
+		}
 		a.pickFile = func(done func(string)) {
 			// Open waits for the user, so it can't run on the main thread.
 			go func() {
