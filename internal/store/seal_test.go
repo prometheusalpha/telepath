@@ -75,37 +75,3 @@ func TestSealedSecrets(t *testing.T) {
 		t.Errorf("another key: locked %d", locked)
 	}
 }
-
-func TestOldKeyMigrates(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "workspace.json")
-	old := memKeyring{}
-	s, _ := NewSealer(old)
-	Save(path, secretWorkspace(), s)
-
-	kr := memKeyring{}
-	oldKr := &countingKeyring{old, 0}
-	s2, _ := NewSealer(kr, oldKr)
-	got, locked, err := Load(path, s2)
-	if err != nil || locked != 0 || got.Items[0].Request.Auth.Password != "pw-secret" || !s2.Stale() {
-		t.Fatalf("locked %d, stale %v, password %q, %v", locked, s2.Stale(), got.Items[0].Request.Auth.Password, err)
-	}
-	Save(path, got, s2)
-
-	// Sealed with the new key now: the old one isn't asked for again.
-	oldKr.gets = 0
-	s3, _ := NewSealer(kr, oldKr)
-	got, locked, _ = Load(path, s3)
-	if locked != 0 || got.Env[0].Value != "env-secret" || s3.Stale() || oldKr.gets != 0 {
-		t.Errorf("after the save: locked %d, stale %v, old key read %d times", locked, s3.Stale(), oldKr.gets)
-	}
-}
-
-type countingKeyring struct {
-	memKeyring
-	gets int
-}
-
-func (k *countingKeyring) Get(name string) ([]byte, bool, error) {
-	k.gets++
-	return k.memKeyring.Get(name)
-}

@@ -31,21 +31,10 @@ const (
 // values.
 type Sealer struct {
 	aead cipher.AEAD
-	// old are keyrings whose keys sealed secrets before, read only for a
-	// secret the key can't open: reading another app's item may ask the
-	// user, so not at every start. olds are their keys, once read.
-	old     []Keyring
-	olds    []cipher.AEAD
-	oldRead bool
-	// stale counts secrets an old key opened, which the next save seals
-	// with the key.
-	stale int
 }
 
 // NewSealer reads the key from kr, making and storing one the first time.
-// Secrets the keys of old sealed still open, and are sealed again with
-// kr's when saved.
-func NewSealer(kr Keyring, old ...Keyring) (*Sealer, error) {
+func NewSealer(kr Keyring) (*Sealer, error) {
 	key, ok, err := kr.Get(keyName)
 	if err != nil {
 		return nil, err
@@ -61,7 +50,7 @@ func NewSealer(kr Keyring, old ...Keyring) (*Sealer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Sealer{aead: aead, old: old}, nil
+	return &Sealer{aead: aead}, nil
 }
 
 func newAEAD(key []byte) (cipher.AEAD, error) {
@@ -73,26 +62,6 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 		return nil, err
 	}
 	return cipher.NewGCM(block)
-}
-
-// Stale reports whether secrets were opened with an old key, which a save
-// would seal with the key.
-func (s *Sealer) Stale() bool { return s != nil && s.stale > 0 }
-
-// oldKeys reads the old keyrings' keys the first time they are needed;
-// those it can't read are left out.
-func (s *Sealer) oldKeys() []cipher.AEAD {
-	if !s.oldRead {
-		s.oldRead = true
-		for _, kr := range s.old {
-			if key, ok, err := kr.Get(keyName); err == nil && ok {
-				if aead, err := newAEAD(key); err == nil {
-					s.olds = append(s.olds, aead)
-				}
-			}
-		}
-	}
-	return s.olds
 }
 
 func (s *Sealer) seal(v string) string {
@@ -119,12 +88,6 @@ func (s *Sealer) open(v string) (string, bool) {
 	}
 	if plain, ok := unseal(s.aead, b); ok {
 		return plain, true
-	}
-	for _, aead := range s.oldKeys() {
-		if plain, ok := unseal(aead, b); ok {
-			s.stale++
-			return plain, true
-		}
 	}
 	return v, false
 }

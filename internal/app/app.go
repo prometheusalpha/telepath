@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -316,29 +315,6 @@ func (a *app) content(c *ui.Context) {
 	})
 }
 
-// keyService is where the key lives in the credential store, whichever
-// way the app runs: the default service is the name under `go run`, and
-// "<identifier>.dev" under `mygo dev`, so each got a key of its own and
-// couldn't read the secrets the others sealed in the same file. Those
-// keys stay readable through oldKeyServices, until their secrets are
-// sealed again.
-const keyService = "io.starchaser.telepath"
-
-var oldKeyServices = []string{"telepath", "io.starchaser.telepath.dev"}
-
-// keychain is the system's credential store as the sealer reads its key.
-type keychain struct{ secrets mygo.SecretsModule }
-
-func (k keychain) Get(name string) ([]byte, bool, error) {
-	v, err := k.secrets.Get(name)
-	if errors.Is(err, mygo.ErrSecretNotFound) {
-		return nil, false, nil
-	}
-	return v, err == nil, err
-}
-
-func (k keychain) Set(name string, v []byte) error { return k.secrets.Set(name, v) }
-
 func themeSource(theme string) mygo.ThemeSource {
 	switch theme {
 	case model.ThemeLight:
@@ -359,11 +335,7 @@ func Run() {
 		path := filepath.Join(dir, "workspace.json")
 		// Without the credential store, secrets stay as they are in the
 		// file: those sealed before stay sealed, new ones go in the clear.
-		var old []store.Keyring
-		for _, svc := range oldKeyServices {
-			old = append(old, keychain{mygo.Secrets.Service(svc)})
-		}
-		sealer, sealErr := store.NewSealer(keychain{mygo.Secrets.Service(keyService)}, old...)
+		sealer, sealErr := store.NewSealer(keychain{keyService})
 		if sealErr != nil {
 			log.Printf("secrets saved unencrypted: %v", sealErr)
 		}
@@ -375,10 +347,6 @@ func Run() {
 		a := newApp(ws, path)
 		a.sealer = sealer
 		a.restore(store.LoadSession(a.sessionPath))
-		if sealer.Stale() {
-			// Sealed again with the one key at the first save.
-			a.touch()
-		}
 		switch {
 		case locked > 0:
 			a.toast = fmt.Sprintf("Couldn't unlock %d saved secrets: the Keychain didn't give Telepath its key", locked)
