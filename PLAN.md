@@ -204,7 +204,9 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 ## Phase 10
 - Enter khi select -> rename tên request
-- Đp
+- Đổi font  + thêm ligature
+- màn settings
+- Icon + build mac app
 
 ---
 

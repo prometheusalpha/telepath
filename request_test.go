@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -110,3 +111,42 @@ func TestEditAndCloseTabs(t *testing.T) {
 }
 
 func keyValue(k, v string) model.KV { return model.KV{Key: k, Value: v, Enabled: true} }
+
+func TestCopyAndSaveTheBody(t *testing.T) {
+	big := strings.Repeat(`{"a":1}`, bigBody/7+1)
+	for _, body := range []string{`{"a":1}`, big} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(body))
+		}))
+		a, _, updates := sendingApp(srv.URL)
+		var savedAs string
+		var saved []byte
+		a.saveFile = func(name string, data []byte, done func(error)) { savedAs, saved = name, data; done(nil) }
+		tt := ui.NewTester(a.view, 1200, 780)
+		tt.Click("ping")
+		tt.Frame()
+		tt.Click("Send")
+		tt.Frame()
+		(<-updates)()
+		tt.Frame()
+		srv.Close()
+
+		if len(body) > bigBody {
+			if a.tabs[0].body.Buffer.String() != body || !tt.HasText("A large body: shown as it came, without formatting.") {
+				t.Error("a large body is formatted")
+			}
+			continue
+		}
+		tt.Click("Copy body")
+		tt.Frame()
+		if tt.Clipboard() != "{\n  \"a\": 1\n}" {
+			t.Errorf("clipboard %q", tt.Clipboard())
+		}
+		tt.Click("Save body")
+		tt.Frame()
+		if savedAs != "response.json" || string(saved) != body || !tt.HasText("Saved the body") {
+			t.Errorf("saved %q as %q", saved, savedAs)
+		}
+	}
+}

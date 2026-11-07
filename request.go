@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"slices"
 	"strings"
 
@@ -15,6 +16,9 @@ import (
 	"telepath/internal/httpx"
 	"telepath/internal/model"
 )
+
+// bigBody is the size past which a response body shows unformatted.
+const bigBody = 2 << 20
 
 var methods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
@@ -67,6 +71,15 @@ func (a *app) send(tb *tab) {
 	client := a.client
 	go func() {
 		resp, err := httpx.Send(ctx, client, req)
+		// Formatted here, off the main thread; a large body shows as it
+		// came, as indenting and highlighting it would stall the window.
+		var text string
+		big := resp != nil && len(resp.Body) > bigBody
+		if resp != nil && !big {
+			text = resp.Pretty()
+		} else if resp != nil {
+			text = string(resp.Body)
+		}
 		a.update(func() {
 			if tb.seq != seq {
 				return
@@ -74,11 +87,11 @@ func (a *app) send(tb *tab) {
 			tb.sending, tb.cancel = false, nil
 			tb.resp, tb.err = resp, err
 			if resp != nil {
-				buf := editor.NewBuffer(resp.Pretty())
-				if resp.JSON() {
+				buf := editor.NewBuffer(text)
+				if !big && resp.JSON() {
 					buf.SetLanguage(editor.LanguageNamed("JSON"))
 				}
-				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: true, NoScrollPastEnd: true}
+				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big, NoScrollPastEnd: true}
 			}
 		})
 	}()
@@ -192,8 +205,25 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		// Where it went, variables and path parameters filled in.
 		ui.Text(c, resp.URL).Font(mono).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
+		if iconButton(c, copyIcon, "Copy body").Clicked() {
+			c.Services().WriteClipboard(tb.body.Buffer.String())
+			c.Toast("Copied the body")
+		}
+		if iconButton(c, downloadIcon, "Save body").Clicked() {
+			a.saveFile(bodyFileName(resp), resp.Body, func(err error) {
+				if err != nil {
+					a.toast = "Couldn't save the body: " + err.Error()
+				} else {
+					a.toast = "Saved the body"
+				}
+			})
+		}
 		ui.Tabs(c, &tb.respTab, "Body", fmt.Sprintf("Headers %d", len(resp.Headers)))
 	})
+	if len(resp.Body) > bigBody {
+		ui.Text(c, "A large body: shown as it came, without formatting.").FontSize(12).
+			TextColor(t.TextMuted).Padding(4, 12).Shrink(0)
+	}
 	ui.Divider(c)
 	switch tb.respTab {
 	case 0:
@@ -404,4 +434,27 @@ func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
 	if changed {
 		a.changed()
 	}
+}
+
+// bodyFileName names a saved body by its type, as response.json.
+func bodyFileName(resp *httpx.Response) string {
+	ext := ".txt"
+	switch {
+	case resp.JSON():
+		ext = ".json"
+	default:
+		for _, h := range resp.Headers {
+			if !strings.EqualFold(h.Key, "Content-Type") {
+				continue
+			}
+			mt, _, _ := mime.ParseMediaType(h.Value)
+			if exts, _ := mime.ExtensionsByType(mt); len(exts) > 0 {
+				ext = exts[0]
+			}
+			if mt == "text/html" {
+				ext = ".html"
+			}
+		}
+	}
+	return "response" + ext
 }

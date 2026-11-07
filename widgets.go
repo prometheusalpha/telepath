@@ -7,10 +7,12 @@ func icon(shapes string) *ui.SVG {
 }
 
 var (
-	plusIcon   = icon(`<path d="M8 3v10M3 8h10"/>`)
-	moreIcon   = icon(`<circle cx="3.5" cy="8" r=".6" fill="currentColor"/><circle cx="8" cy="8" r=".6" fill="currentColor"/><circle cx="12.5" cy="8" r=".6" fill="currentColor"/>`)
-	searchIcon = icon(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/>`)
-	sendIcon   = icon(`<path d="M2.5 8h10M9 4.5L12.5 8 9 11.5"/>`)
+	plusIcon     = icon(`<path d="M8 3v10M3 8h10"/>`)
+	moreIcon     = icon(`<circle cx="3.5" cy="8" r=".6" fill="currentColor"/><circle cx="8" cy="8" r=".6" fill="currentColor"/><circle cx="12.5" cy="8" r=".6" fill="currentColor"/>`)
+	searchIcon   = icon(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/>`)
+	copyIcon     = icon(`<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>`)
+	downloadIcon = icon(`<path d="M8 2.5v8M4.5 7.5L8 11l3.5-3.5M3 13.5h10"/>`)
+	sendIcon     = icon(`<path d="M2.5 8h10M9 4.5L12.5 8 9 11.5"/>`)
 )
 
 // methodBadge shortens the long methods so badges keep one width in the

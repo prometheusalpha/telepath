@@ -47,6 +47,7 @@ go vet ./... && go test ./...
 ### Tab và gửi request
 - Response, trạng thái đang gửi, editor của body nằm trong `tab` (chỉ trong bộ nhớ), không nằm trong model nên không được lưu.
 - Gửi request chạy trong goroutine, đọc một bản copy của `model.Request`, rồi trả kết quả qua `a.update` (= `win.Update` khi chạy app thật). Mỗi lần gửi hoặc cancel thì tăng `tab.seq`; response về mà `seq` không khớp thì bỏ qua (response muộn của lần đã cancel).
+- Body response được format trong goroutine gửi request, không làm trên main thread. Lớn hơn `bigBody` (2 MB) thì hiện y nguyên như nhận được: không format, không tô màu, không soft wrap. Ở nhánh đó phải xét `!big` trước khi gọi `resp.JSON()`, vì `json.Valid` sẽ quét toàn bộ body.
 - Sửa model ở đâu cũng phải `a.changed()`, kể cả Select/URL (`Changed()`). `changed()` còn đóng tab của request đã bị xoá (`pruneTabs`).
 - Menu mặc định của macOS gắn ⌘W cho Close Window. App tự `SetMenu` để ⌘W là Close Tab, còn Close Window chuyển sang ⇧⌘W. Muốn thêm phím tắt cấp app thì sửa menu này.
 

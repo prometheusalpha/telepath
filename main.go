@@ -351,7 +351,11 @@ func main() {
 		}
 		a.saveFile = func(name string, data []byte, done func(error)) {
 			go func() {
-				path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: win, Title: "Export", DefaultPath: name, Filters: jsonFiles})
+				var filters []mygo.FileFilter
+				if filepath.Ext(name) == ".json" {
+					filters = jsonFiles
+				}
+				path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: win, Title: "Save", DefaultPath: name, Filters: filters})
 				if err != nil || path == "" {
 					return
 				}
