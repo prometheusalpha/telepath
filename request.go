@@ -32,7 +32,8 @@ type tab struct {
 	// drafts are the blank rows of the tables, by table.
 	drafts   map[string]*model.KV
 	bodyEdit *editor.State
-	reveal   bool // shows the password, token or key typed in the Auth tab
+	reveal   bool           // shows the password, token or key typed in the Auth tab
+	pasted   *model.Request // a curl command pasted into the URL, for next frame
 
 	sending bool
 	cancel  context.CancelFunc
@@ -106,7 +107,13 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 	t := c.Theme()
 	n := a.tree.byID[tb.id]
 	r := n.Request
-	if c.Shortcut(ui.Cmd, ui.KeyEnter) {
+	if tb.pasted != nil {
+		*r, tb.pasted = *tb.pasted, nil
+		tb.bodyEdit = nil // the editor leads once made, so it's made anew
+		a.changed()
+		c.Toast("Imported cURL")
+	}
+	if a.shortcut(c, "send") {
 		a.send(tb)
 	}
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(10, 12).Shrink(0).Children(func() {
@@ -116,7 +123,8 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			a.changed()
 		}
 		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).
-			Placeholder("{{base}}/users").Label("URL").Bind(&a.urlHandle)
+			Placeholder("{{base}}/users").Label("URL").Bind(&a.urlHandle).
+			OnPaste(func(text string) bool { return a.pasteCurl(tb, text) })
 		if a.highlightVars(c, url, r.URL) {
 			url.Tooltip(a.env.Expand(r.URL, nil))
 		}
@@ -132,7 +140,7 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			if ui.Button(c, "Cancel").Width(84).Clicked() {
 				a.cancelSend(tb)
 			}
-		} else if ui.PrimaryButton(c, "Send").Width(84).Tooltip("⌘↵").Clicked() {
+		} else if ui.PrimaryButton(c, "Send").Width(84).Tooltip(a.hint("", "send")).Clicked() {
 			a.send(tb)
 		}
 	})
@@ -194,7 +202,11 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 				ui.Text(c, tb.err.Error()).FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted).Selectable()
 			})
 		case tb.resp == nil:
-			emptyState(c, "No response yet", "Press Send, or ⌘↵")
+			hint := "Press Send"
+			if k := a.keys("send"); !k.none() {
+				hint += ", or " + k.String()
+			}
+			emptyState(c, "No response yet", hint)
 		default:
 			a.responseBody(c, tb)
 		}

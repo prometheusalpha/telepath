@@ -54,26 +54,26 @@ func (a *app) sidebar(c *ui.Context) {
 			if tb := a.current(); tb != nil && iconButton(c, locateIcon, "Reveal Current Request").Clicked() {
 				a.reveal(tb.id)
 			}
-			if iconButton(c, searchIcon, "Search").Tooltip("Search ⌘K").Clicked() {
+			if iconButton(c, searchIcon, "Search").Tooltip(a.hint("Search", "search")).Clicked() {
 				a.openSearch()
 			}
 			iconButton(c, moreIcon, "More").Menu(func(m *ui.Menu) {
-				if m.Item("Import Collection…").Shortcut(ui.Cmd, ui.KeyO).Chosen() {
+				if a.menuItem(m, "import").Chosen() {
 					a.importFile()
 				}
-				if m.Item("Import cURL…").Shortcut(ui.Cmd|ui.Shift, ui.KeyO).Chosen() {
+				if a.menuItem(m, "import-curl").Chosen() {
 					a.openCurl()
 				}
 				m.Separator()
-				if m.Item("Export Collection…").Chosen() {
+				if a.menuItem(m, "export").Chosen() {
 					a.exportWorkspace()
 				}
 			})
 			iconButton(c, plusIcon, "New").Menu(func(m *ui.Menu) {
-				if m.Item("New Request").Shortcut(ui.Cmd, ui.KeyN).Chosen() {
+				if a.menuItem(m, "new-request").Chosen() {
 					a.newNode(model.NewRequest("New Request"))
 				}
-				if m.Item("New Folder").Shortcut(ui.Cmd|ui.Shift, ui.KeyN).Chosen() {
+				if a.menuItem(m, "new-folder").Chosen() {
 					a.newNode(model.NewFolder("New Folder"))
 				}
 			})

@@ -34,7 +34,13 @@ type app struct {
 	envDraft model.KV
 
 	settingsOpen bool
+	settingsTab  int
 	monoFamilies []string // the code fonts settings offer, once they opened
+	recording    string   // the command Settings takes the next keys for
+	keysNote     keysNote // what setting a command's keys did to another
+	// menuKeys gives the menu items the commands' keys again, none while
+	// recording; nil in tests.
+	menuKeys func()
 
 	suggest    suggestion // the variables listed under the input typed in
 	dismissed  dismissal
@@ -245,22 +251,22 @@ func (a *app) view(c *ui.Context) {
 	a.autosave(c)
 }
 
-// shortcuts are the window's keys. ⌘N and ⇧⌘N are the menu's too, which
-// takes them first in the app; the view's are for windows without that
-// menu, as tests'.
+// shortcuts are the window's keys. The menu has those of its commands
+// too, and takes them first in the app; the view's are for windows without
+// that menu, as tests'.
 func (a *app) shortcuts(c *ui.Context) {
-	switch {
-	case c.Shortcut(ui.Cmd, ui.KeyN):
-		a.newNode(model.NewRequest("New Request"))
-	case c.Shortcut(ui.Cmd|ui.Shift, ui.KeyN):
-		a.newNode(model.NewFolder("New Folder"))
-	case c.Shortcut(ui.Cmd, ui.KeyL) && a.current() != nil:
+	for _, cmd := range commands {
+		if cmd.run != nil && a.shortcut(c, cmd.id) {
+			cmd.run(a)
+		}
+	}
+	if a.shortcut(c, "focus-url") && a.current() != nil {
 		// Only with a URL showing: Focus waits for one otherwise, and would
 		// take the focus whenever a tab opens next.
 		a.urlHandle.Focus(c)
 	}
 	for i := range 9 {
-		if !c.Shortcut(ui.Cmd, ui.Key1+ui.Key(i)) || len(a.tabs) == 0 {
+		if a.recording != "" || !c.Shortcut(ui.Cmd, ui.Key1+ui.Key(i)) || len(a.tabs) == 0 {
 			continue
 		}
 		// ⌘9 is the last tab, however many there are, as in browsers.
@@ -291,7 +297,11 @@ func (a *app) content(c *ui.Context) {
 			if tb := a.current(); tb != nil {
 				a.requestView(c, tb)
 			} else {
-				emptyState(c, "No request open", "Pick one from the sidebar, or press ⌘K to search")
+				hint := "Pick one from the sidebar"
+				if k := a.keys("search"); !k.none() {
+					hint += ", or press " + k.String() + " to search"
+				}
+				emptyState(c, "No request open", hint)
 			}
 		})
 	})
@@ -375,14 +385,21 @@ func main() {
 			return &mygo.MenuItem{ID: id, Label: label, Type: mygo.MenuItemRadio, Checked: ws.Theme == theme,
 				Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { a.setTheme(theme) }) }}
 		}
-		// The default menu's Close Window would take ⌘W from the tabs.
+		// A command's item, with the keys set for it.
+		item := func(id string) *mygo.MenuItem {
+			cmd := commandByID(id)
+			return &mygo.MenuItem{ID: id, Label: cmd.label, Accelerator: a.keys(id).accel(),
+				Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { cmd.run(a) }) }}
+		}
+		// Not RoleClose, which brings ⌘W along when it has no keys of its
+		// own, and ⌘W closes a tab.
+		closeWindow := item("close-window")
+		closeWindow.Click = func(*mygo.MenuItem, *mygo.Window) { win.Close() }
 		menu := mygo.NewMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu, Submenu: []*mygo.MenuItem{
 				{Role: mygo.RoleAbout},
 				mygo.Separator(),
-				{Label: "Settings…", Accelerator: "CmdOrCtrl+,", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(a.openSettings)
-				}},
+				item("settings"),
 				mygo.Separator(),
 				{Role: mygo.RoleServices},
 				mygo.Separator(),
@@ -393,34 +410,19 @@ func main() {
 				{Role: mygo.RoleQuit},
 			}},
 			{Label: "File", Submenu: []*mygo.MenuItem{
-				{Label: "New Request", Accelerator: "CmdOrCtrl+N", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(func() { a.newNode(model.NewRequest("New Request")) })
-				}},
-				{Label: "New Folder", Accelerator: "CmdOrCtrl+Shift+N", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(func() { a.newNode(model.NewFolder("New Folder")) })
-				}},
+				item("new-request"),
+				item("new-folder"),
 				mygo.Separator(),
-				{Label: "Close Tab", Accelerator: "CmdOrCtrl+W", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(func() { a.closeTab(a.active) })
-				}},
-				{Label: "Close Window", Accelerator: "CmdOrCtrl+Shift+W", Role: mygo.RoleClose},
+				item("close-tab"),
+				item("close-other-tabs"),
+				closeWindow,
 				mygo.Separator(),
-				{Label: "Import Collection…", Accelerator: "CmdOrCtrl+O", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(a.importFile)
-				}},
-				{Label: "Import cURL…", Accelerator: "CmdOrCtrl+Shift+O", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(a.openCurl)
-				}},
-				{Label: "Export Collection…", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(a.exportWorkspace)
-				}},
+				item("import"),
+				item("import-curl"),
+				item("export"),
 				mygo.Separator(),
-				{Label: "Search…", Accelerator: "CmdOrCtrl+K", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(a.openSearch)
-				}},
-				{Label: "Variables…", Accelerator: "CmdOrCtrl+E", Click: func(*mygo.MenuItem, *mygo.Window) {
-					win.Update(func() { a.envOpen = true })
-				}},
+				item("search"),
+				item("variables"),
 			}},
 			{Role: mygo.RoleEditMenu},
 			{Label: "View", Submenu: []*mygo.MenuItem{
@@ -444,6 +446,17 @@ func main() {
 			// set here rather than left to the menu.
 			for id, t := range map[string]string{"theme-system": model.ThemeSystem, "theme-light": model.ThemeLight, "theme-dark": model.ThemeDark} {
 				menu.ItemByID(id).SetChecked(t == theme)
+			}
+		}
+		a.menuKeys = func() {
+			for _, cmd := range commands {
+				if it := menu.ItemByID(cmd.id); it != nil {
+					acc := ""
+					if a.recording == "" {
+						acc = a.keys(cmd.id).accel()
+					}
+					it.SetAccelerator(acc)
+				}
 			}
 		}
 		a.onLayout = func(right bool) {

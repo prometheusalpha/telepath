@@ -214,6 +214,12 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Response JSON: theme editor riêng để key, string, number, true/false/null có màu khác nhau.
 - Icon mới: logo `design/logo.svg` màu trắng trên nền gradient đen → xám đậm.
 
+## Phase 11 — Phím tắt, paste cURL
+
+- Paste lệnh `curl …` vào ô URL: ghi đè request đang mở (method, URL, query, header, body, auth), giữ tên và vị trí; lệnh đọc không được thì báo toast, text khác paste như thường.
+- ⇧⌘W là Close Other Tabs; Close Window không có phím tắt.
+- Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
+
 ---
 
 ## Quyết định đã chốt

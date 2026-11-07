@@ -26,7 +26,7 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
@@ -55,14 +55,17 @@ go vet ./... && go test ./...
 - Gửi request chạy trong goroutine, đọc một bản copy của `model.Request`, rồi trả kết quả qua `a.update` (= `win.Update` khi chạy app thật). Mỗi lần gửi hoặc cancel thì tăng `tab.seq`; response về mà `seq` không khớp thì bỏ qua (response muộn của lần đã cancel).
 - Body response được format trong goroutine gửi request, không làm trên main thread. Lớn hơn `bigBody` (2 MB) thì hiện y nguyên như nhận được: không format, không tô màu, không soft wrap. Ở nhánh đó phải xét `!big` trước khi gọi `resp.JSON()`, vì `json.Valid` sẽ quét toàn bộ body.
 - Sửa model ở đâu cũng phải `a.changed()`, kể cả Select/URL (`Changed()`). `changed()` còn đóng tab của request đã bị xoá (`pruneTabs`).
-- Phím tắt: ⌘N / ⇧⌘N (tạo mới tại vị trí đang chọn ở sidebar), ⌘1…⌘9 (⌘9 là tab cuối), ⌘L (focus ô URL, chỉ khi đang có tab). Các phím này nằm trong `a.shortcuts`. ⌘N / ⇧⌘N có cả trong menu File: trên app thật thì menu nhận phím trước, view không thấy, nên không bị tạo hai lần; còn trong test không có menu thì view xử lý.
-- Menu mặc định của macOS gắn ⌘W cho Close Window. App tự `SetMenu` để ⌘W là Close Tab, còn Close Window chuyển sang ⇧⌘W. Muốn thêm phím tắt cấp app thì sửa menu này. Menu app được liệt kê tay (không dùng mục mặc định của `RoleAppMenu`) để chèn Settings… ⌘,.
+- Phím tắt cấp app là bảng `commands` (`shortcuts.go`): id, label, phím mặc định, `run`. Menu (`item(id)` trong `main`), `a.shortcuts`, tooltip/hint (`a.hint`) và menu của sidebar (`a.menuItem`) đều đọc phím qua `a.keys(id)`; đừng ghi cứng "⌘K" ở đâu nữa. Thêm lệnh mới thì thêm vào bảng. Lệnh có `run == nil` (Focus URL, Send, Close Window) thì nơi dùng tự xử lý.
+- View cũng bắt phím của mọi lệnh có `run`: trên app thật menu nhận phím trước, view không thấy, nên không chạy hai lần; trong test không có menu thì view xử lý. ⌘1…⌘9 (⌘9 là tab cuối) cố định, không nằm trong bảng.
+- Close Window không dùng `RoleClose`: role tự gắn ⌘W khi item không có accelerator. Menu app được liệt kê tay (không dùng mục mặc định của `RoleAppMenu`) để chèn Settings….
+- `Workspace.Shortcuts` chỉ lưu lệnh khác mặc định (`"Shift+Cmd+N"`, `""` là không có phím). Lúc đang ghi phím (`a.recording`), `a.menuKeys` gỡ hết accelerator khỏi menu (menu nhận phím ⌘ trước view) và `a.shortcut` không bắt phím nào; đổi phím xong thì `a.menuKeys` gắn lại. Phím của Edit menu/app menu (⌘C, ⌘Q…) vẫn bị macOS lấy trước, nên nằm trong `reservedKeys`.
 
 ### Params, Path, bảng key/value
 - `Request.URL` giữ nguyên chữ người dùng gõ, có cả các query đang bật; `Query` giữ thêm các dòng đã tắt (URL không thể hiện được). Sửa URL thì `QueryFromURL` + `PathFromURL`; sửa bảng Params thì `URLFromQuery`. Không escape gì trong model, chỉ escape lúc gửi (`httpx.ResolveURL`), nên `{{var}}` và chữ có dấu cách vẫn hiện y như gõ.
 - `PathNames` bỏ qua phần host, nên cổng trong `localhost:8080` không bị coi là `:name`.
 - `kvTable`: dòng trống cuối bảng gắn với `draft` (nằm trong `tab.drafts`). Vừa gõ ký tự đầu là draft thành dòng thật; dòng đó được gán `c.Key(i)` bằng đúng key của dòng trống trước đó, nhờ vậy ô nhập vẫn giữ focus. Đừng đổi cách đặt key này.
 - Label của từng ô là duy nhất (`"Query key 1"`, `"Header new key"`…) để test bấm vào được.
+- Paste cURL vào ô URL: `OnPaste` chỉ parse và để vào `tab.pasted`, frame sau mới chép vào request. Sửa chuỗi đang bind ngay trong callback paste thì ô input ghi đè lại bằng chữ cũ.
 - Content-Type người dùng tự đặt luôn thắng, kể cả với multipart (dù như vậy là mất boundary).
 - `mygo.Dialog.Open` chờ người dùng chọn xong mới trả về, nên phải gọi trong goroutine rồi trả kết quả qua `win.Update` (`a.pickFile`). Callback ghi đường dẫn vào dòng theo vị trí và chỉ ghi nếu key ở đó chưa đổi, vì trong lúc dialog mở các dòng có thể đã bị thêm hoặc xoá.
 - Body JSON/Text: buffer của editor (`tab.bodyEdit`) là nguồn chính; mỗi frame so `Buffer.String()` với `Body.Text` rồi chép sang. Chỉ gọi `SetLanguage` khi đổi kiểu body.

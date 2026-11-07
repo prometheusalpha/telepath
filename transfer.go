@@ -174,6 +174,23 @@ func (a *app) importCurl() {
 	a.curlOpen, a.curlText, a.curlErr = false, "", ""
 }
 
+// pasteCurl takes a curl command pasted into the URL as the request
+// itself, all but its name, as Postman does; other text pastes as usual.
+// The request changes next frame: the URL input would write back its own
+// text over one changed as the paste comes.
+func (a *app) pasteCurl(tb *tab, text string) bool {
+	if f := strings.Fields(text); len(f) == 0 || f[0] != "curl" {
+		return false
+	}
+	r, err := importx.ParseCurl(text)
+	if err != nil {
+		a.toast = "Couldn't read the cURL command: " + err.Error()
+		return true
+	}
+	tb.pasted = r
+	return true
+}
+
 func (a *app) openCurl() {
 	a.curlOpen, a.curlErr = true, ""
 }

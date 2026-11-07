@@ -40,10 +40,10 @@ func (a *app) sidebarFooter(c *ui.Context) {
 		if n := len(a.env); n > 0 {
 			count = fmt.Sprint(n)
 		}
-		if footerButton(c, braceIcon, "Variables", count).Tooltip("⌘E").Clicked() {
+		if footerButton(c, braceIcon, "Variables", count).Tooltip(a.hint("", "variables")).Clicked() {
 			a.envOpen = true
 		}
-		if footerButton(c, gearIcon, "Settings", "").Tooltip("⌘,").Clicked() {
+		if footerButton(c, gearIcon, "Settings", "").Tooltip(a.hint("", "settings")).Clicked() {
 			a.openSettings()
 		}
 	})

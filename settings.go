@@ -31,43 +31,16 @@ func (a *app) openSettings() {
 
 func (a *app) settingsModal(c *ui.Context) {
 	ui.Modal(c, &a.settingsOpen, func() {
-		ui.Column(c).Width(460).Gap(4).Children(func() {
+		ui.Column(c).Width(480).Gap(4).Children(func() {
 			ui.Text(c, "Settings").FontSize(16).FontWeight(600).Padding(0, 0, 8)
-			ui.Form(c, func() {
-				ui.Field(c, "Appearance", func() {
-					ui.Row(c).Children(func() {
-						i := slices.IndexFunc(themes, func(th themeChoice) bool { return th.theme == a.ws.Theme })
-						labels := make([]string, len(themes))
-						for j, th := range themes {
-							labels[j] = th.label
-						}
-						if ui.Segmented(c, &i, labels...).Changed() {
-							a.setTheme(themes[i].theme)
-						}
-					})
-				})
-				font := a.ws.MonoFont
-				if font == "" {
-					font = builtinLabel
+			ui.Tabs(c, &a.settingsTab, "General", "Shortcuts")
+			ui.Column(c).Padding(12, 0, 0).Children(func() {
+				switch a.settingsTab {
+				case 0:
+					a.generalSettings(c)
+				case 1:
+					a.shortcutSettings(c)
 				}
-				ui.Field(c, "Code font", func() {
-					if ui.Select(c, &font, a.monoFamilies).Changed() {
-						if font == builtinLabel {
-							font = ""
-						}
-						a.ws.MonoFont = font
-						a.fontChanged()
-					}
-				}).Description("URLs, key/value tables, and the request and response bodies.")
-				size := float64(codeSize)
-				ui.Field(c, "Code size", func() {
-					ui.Row(c).Children(func() {
-						if ui.NumberInput(c, &size, 9, 24, 1).Width(110).Changed() {
-							a.ws.MonoSize = float32(size)
-							a.fontChanged()
-						}
-					})
-				}).Description("The request and response bodies.")
 			})
 			ui.Row(c).Justify(ui.End).Padding(12, 0, 0).Children(func() {
 				if ui.PrimaryButton(c, "Done").Clicked() {
@@ -75,6 +48,49 @@ func (a *app) settingsModal(c *ui.Context) {
 				}
 			})
 		})
+	})
+	if !a.settingsOpen || a.settingsTab != 1 {
+		a.record("")
+		a.keysNote = keysNote{}
+	}
+}
+
+func (a *app) generalSettings(c *ui.Context) {
+	ui.Form(c, func() {
+		ui.Field(c, "Appearance", func() {
+			ui.Row(c).Children(func() {
+				i := slices.IndexFunc(themes, func(th themeChoice) bool { return th.theme == a.ws.Theme })
+				labels := make([]string, len(themes))
+				for j, th := range themes {
+					labels[j] = th.label
+				}
+				if ui.Segmented(c, &i, labels...).Changed() {
+					a.setTheme(themes[i].theme)
+				}
+			})
+		})
+		font := a.ws.MonoFont
+		if font == "" {
+			font = builtinLabel
+		}
+		ui.Field(c, "Code font", func() {
+			if ui.Select(c, &font, a.monoFamilies).Changed() {
+				if font == builtinLabel {
+					font = ""
+				}
+				a.ws.MonoFont = font
+				a.fontChanged()
+			}
+		}).Description("URLs, key/value tables, and the request and response bodies.")
+		size := float64(codeSize)
+		ui.Field(c, "Code size", func() {
+			ui.Row(c).Children(func() {
+				if ui.NumberInput(c, &size, 9, 24, 1).Width(110).Changed() {
+					a.ws.MonoSize = float32(size)
+					a.fontChanged()
+				}
+			})
+		}).Description("The request and response bodies.")
 	})
 }
 
