@@ -204,7 +204,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 ## Phase 10
 - Enter khi select -> rename tên request
-- Đổi font jetbrains mono nerd font + thêm ligature
+- Đổi font mono -> jetbrains mono nerd font + thêm ligature
 - màn settings
 - Icon + build mac app
 - Context menu của tab: close, close others

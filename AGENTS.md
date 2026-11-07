@@ -7,12 +7,14 @@ API client desktop nhỏ (sidebar cây folder/request, tab, editor request, mộ
 ```sh
 go run .                 # chạy app
 go tool mygo dev         # chạy app với live reload (build lại khi sửa Go)
-go tool mygo build       # build production vào build/
+go tool mygo build       # build production vào build/darwin-arm64/telepath.app (ký ad-hoc; thêm -skip-dmg cho nhanh)
 go vet ./... && go test ./...
 ```
 
 - Docs MyGo đúng version đang pin: `$(go list -m -f '{{.Dir}}' github.com/egoist/mygo)/docs/ui/*.md`; API thật thì grep `ui/api_gen.go`. Kiểm tra API trong source trước khi dùng, đừng đoán.
 - Skill bảo trì MyGo: `.agents/skills/mygo-maintenance/SKILL.md`.
+- Icon: nguồn là `design/icon.svg`, file app dùng là `resources/icon.png` (1024×1024). Đừng để file nguồn trong `resources/`, vì cả thư mục đó bị đóng gói vào app. Sửa SVG xong thì render lại PNG bằng một test tạm: `ui.Image(c, ui.MustParseSVG(svg)).Size(1024, 1024)` trong `ui.NewTester(view, 1024, 1024)`, nền root để `ui.Transparent`, rồi `png.Encode(tt.Image())`. Xong thì xoá test đó.
+- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` hiện vẫn là giá trị mẫu `com.example.telepath`.
 - `mygo dev` chạy app tên `<name> Dev` với identifier riêng, nên dữ liệu (`workspace.json` trong `PathUserData`) có thể khác với khi chạy `go run .`.
 
 ## Cấu trúc
