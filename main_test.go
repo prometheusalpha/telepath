@@ -109,7 +109,7 @@ func TestAutosave(t *testing.T) {
 		t.Fatal("saved before the delay")
 	}
 	tt.Advance(saveDelay + 100*time.Millisecond)
-	ws, err := store.Load(path)
+	ws, _, err := store.Load(path, nil)
 	if err != nil || len(ws.Items) != 1 {
 		t.Fatalf("after the delay: %v, %d items", err, len(ws.Items))
 	}
@@ -181,7 +181,7 @@ func TestSessionComesBack(t *testing.T) {
 	a.sidebarWidth, a.split = 310, 62
 	tt.Advance(saveDelay + 100*time.Millisecond)
 
-	ws2, err := store.Load(path)
+	ws2, _, err := store.Load(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

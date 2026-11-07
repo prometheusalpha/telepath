@@ -9,17 +9,17 @@ import (
 
 func TestRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sub", "workspace.json")
-	w, err := Load(path)
+	w, _, err := Load(path, nil)
 	if err != nil || len(w.Items) != 0 {
 		t.Fatalf("missing file: %v, %d items", err, len(w.Items))
 	}
 	f := model.NewFolder("Auth")
 	w.Add(f, "")
 	w.Add(model.NewRequest("login"), f.ID)
-	if err := Save(path, w); err != nil {
+	if err := Save(path, w, nil); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Load(path)
+	got, _, err := Load(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -68,7 +68,7 @@ go vet ./... && go test ./...
 - API key trong query được nối vào `RawQuery`; đừng dùng `URL.Query().Encode()` vì nó sắp xếp lại thứ tự query.
 - Form có label thì dùng `ui.Form` + `ui.Field` (bấm vào label sẽ focus control). Control nào phải giữ đúng chiều rộng của nó (như Segmented) thì bọc trong `ui.Row`, không thì bị kéo dài theo field.
 - `TextInput.Password()` chỉ che chữ trong những frame có gọi nó; muốn hiện thì frame đó không gọi nữa.
-- Credential được lưu dạng plain text trong `workspace.json`.
+- Credential (password, token, value của API key) và value của biến secret được mã hoá trong `workspace.json` (xem phần Lưu dữ liệu).
 
 ### Biến
 - Chỉ có một bộ biến (`Workspace.Env`). `a.env` là bản map đã dựng sẵn, được làm lại trong `changed()`; view tra trong map này chứ không duyệt `ws.Env` mỗi frame.
@@ -76,7 +76,7 @@ go vet ./... && go test ./...
 - Biến không có giá trị thì được gửi nguyên văn và báo trong `tab.missing`; giá trị của một biến không được thay tiếp, nên biến không thể tự lặp vào chính nó.
 - `Refs` và `Expand` dùng chung một hàm `scan`; sửa cú pháp thì chỉ sửa ở đó.
 - `highlightVars` tô màu bằng `TextRanges` (vị trí tính theo rune). Ô bị `Password()` thì không hiện được màu.
-- Biến secret chỉ được che trong UI, file vẫn lưu dạng plain text (Phase 9 sẽ chuyển sang Keychain).
+- Value của biến secret được mã hoá trong file, giống credential của Auth.
 - ⌘E (Variables…) nằm trong menu bar, không xử lý trong view.
 - Gợi ý biến (`suggestVars`): gọi ngay sau khi dựng ô nhập, truyền con trỏ tới giá trị và một label duy nhất. Hàm trả `true` khi đã chèn biến, vì `Changed()` của ô không báo việc này; nơi gọi phải xử lý như khi ô bị sửa (`a.changed()`, đồng bộ Query…).
 - Danh sách là `ui.Overlay` + `AttachTo` (không phải popover, để ô nhập vẫn giữ focus). Các dòng dùng `KeepFocus()`. ↑/↓/Enter/Tab/Esc bắt qua `OnTextKey`, mà hàm này có thể chạy giữa hai frame, nên vị trí con trỏ được tính lại từ `k.Text()` cộng phần chữ gõ thêm. `TextKey` không đặt được con trỏ: vị trí mong muốn ghi vào `a.caretLabel`/`a.caretAt` để frame sau gọi `SetTextSelection`.
@@ -101,6 +101,10 @@ go vet ./... && go test ./...
 - Trạng thái mở/đóng folder nằm ở `a.files.Open`, chỉ chép sang `Folder.Open` lúc `flush` (lần ghi kế tiếp hoặc khi thoát app qua `OnBeforeQuit`).
 - Vị trí khu response (`a.responseRight`) và kích thước chia riêng của từng bố cục (`split` theo chiều dọc, `splitRight` theo chiều ngang) cũng lưu trong session. Nút đổi bố cục ở cuối hàng tab của request, và View menu có hai mục chọn; cả hai đều đi qua `setResponseRight`, hàm này gọi `a.onLayout` để cập nhật dấu tích trong menu.
 - Tab đang mở, tab đang chọn và kích thước hai thanh chia lưu trong `session.json`, cạnh `workspace.json`. File này được ghi cùng `flush`; mở/đóng/chuyển tab gọi `a.touch()` để kích hoạt auto-save mà không phải `reindex`. Đọc session lỗi thì bỏ qua (`LoadSession` trả session rỗng). Riêng thanh chia kéo xong chỉ được lưu theo lần ghi kế tiếp hoặc khi thoát.
+- Secret trong file: `store.Sealer` mã hoá bằng AES-GCM (`enc:v1:…`), khoá 32 byte nằm trong Keychain (`mygo.Secrets`, tên `workspace-key`). Không lưu từng secret vào Keychain, vì mỗi mục tối đa 2560 byte. Các field được mã hoá liệt kê trong hàm `secrets()`; thêm field nhạy cảm mới thì thêm vào đó.
+- Không lấy được khoá thì sealer là `nil`: giá trị đã mã hoá được giữ nguyên và `Load` đếm vào `locked` (app báo bằng toast), giá trị mới thì lưu chữ thường. Đừng xoá hay ghi đè các chuỗi `enc:v1:` mà mình không giải mã được.
+- Header (như `Authorization` tự gõ tay) và file export không được mã hoá; export cố ý xuất chữ thường để mang sang máy khác dùng được.
+- `go run .` và `mygo dev` dùng service Keychain khác nhau (tên app và `<identifier>.dev`), nên mỗi bản có khoá riêng và không đọc được secret của bản kia; lúc đó app báo "Couldn't unlock…".
 - `store.Load` lỗi thì app `log.Fatal` là cố ý: mở app với workspace trống thì lần sửa đầu tiên sẽ ghi đè mất file cũ.
 
 ### Test

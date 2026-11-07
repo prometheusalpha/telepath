@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,6 +26,7 @@ type app struct {
 	ws          *model.Workspace
 	path        string // "" keeps the workspace in memory, as tests do
 	sessionPath string
+	sealer      *store.Sealer // nil saves secrets as they are
 	tree        tree
 	env         vars.Env // ws.Env, looked up as the views build
 
@@ -181,7 +184,7 @@ func (a *app) flush() error {
 		}
 		return true
 	})
-	if err := store.Save(a.path, a.ws); err != nil {
+	if err := store.Save(a.path, a.ws, a.sealer); err != nil {
 		return err
 	}
 	if err := store.SaveSession(a.sessionPath, a.session()); err != nil {
@@ -288,6 +291,19 @@ func (a *app) content(c *ui.Context) {
 	})
 }
 
+// keychain is the system's credential store as the sealer reads its key.
+type keychain struct{}
+
+func (keychain) Get(name string) ([]byte, bool, error) {
+	v, err := mygo.Secrets.Get(name)
+	if errors.Is(err, mygo.ErrSecretNotFound) {
+		return nil, false, nil
+	}
+	return v, err == nil, err
+}
+
+func (keychain) Set(name string, v []byte) error { return mygo.Secrets.Set(name, v) }
+
 func themeSource(theme string) mygo.ThemeSource {
 	switch theme {
 	case model.ThemeLight:
@@ -305,13 +321,26 @@ func main() {
 			log.Fatal(err)
 		}
 		path := filepath.Join(dir, "workspace.json")
-		ws, err := store.Load(path)
+		// Without the credential store, secrets stay as they are in the
+		// file: those sealed before stay sealed, new ones go in the clear.
+		sealer, sealErr := store.NewSealer(keychain{})
+		if sealErr != nil {
+			log.Printf("secrets saved unencrypted: %v", sealErr)
+		}
+		ws, locked, err := store.Load(path, sealer)
 		if err != nil {
 			// Starting empty would overwrite the file on the first edit.
 			log.Fatalf("reading %s: %v", path, err)
 		}
 		a := newApp(ws, path)
+		a.sealer = sealer
 		a.restore(store.LoadSession(a.sessionPath))
+		switch {
+		case locked > 0:
+			a.toast = fmt.Sprintf("Couldn't unlock %d saved secrets: the Keychain didn't give Telepath its key", locked)
+		case sealErr != nil:
+			a.toast = "Secrets are saved unencrypted: the Keychain isn't available"
+		}
 		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 			if err := a.flush(); err != nil {
 				log.Print(err)

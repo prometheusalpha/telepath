@@ -11,27 +11,31 @@ import (
 	"telepath/internal/model"
 )
 
-// Load returns an empty workspace when the file does not exist yet.
-func Load(path string) (*model.Workspace, error) {
+// Load returns an empty workspace when the file does not exist yet. It
+// decrypts the secrets s sealed; locked counts those it couldn't, as
+// without the key (a nil s), which stay sealed.
+func Load(path string, s *Sealer) (w *model.Workspace, locked int, err error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return &model.Workspace{Version: model.Version, Items: []*model.Node{}}, nil
+		return &model.Workspace{Version: model.Version, Items: []*model.Node{}}, 0, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	var w model.Workspace
-	if err := json.Unmarshal(b, &w); err != nil {
-		return nil, err
+	w = &model.Workspace{}
+	if err := json.Unmarshal(b, w); err != nil {
+		return nil, 0, err
 	}
 	if w.Items == nil {
 		w.Items = []*model.Node{}
 	}
-	return &w, nil
+	return w, s.opened(w), nil
 }
 
-func Save(path string, w *model.Workspace) error {
-	b, err := json.MarshalIndent(w, "", "  ")
+// Save writes w with its secrets sealed by s, or as they are with a nil s,
+// where the system has no credential store.
+func Save(path string, w *model.Workspace, s *Sealer) error {
+	b, err := s.sealed(w)
 	if err != nil {
 		return err
 	}

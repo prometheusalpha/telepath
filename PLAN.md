@@ -1,5 +1,7 @@
 # Telepath — Plan
 
+**Trạng thái:** Phase 0–9 đã xong (xem `git log`).
+
 API client desktop nhỏ gọn, viết bằng Go + MyGo native UI (`github.com/egoist/mygo` v0.8.3, package `ui`).
 
 ## Phạm vi
@@ -209,6 +211,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Icon + build mac app
 - Context menu của tab: close, close others
 - Nút focus request hiện tại ở sidebar
+- Syntax highlighting ở response json
 
 ---
 
