@@ -150,3 +150,29 @@ func TestCopyAndSaveTheBody(t *testing.T) {
 		}
 	}
 }
+
+func TestResponseOnTheRight(t *testing.T) {
+	a, _, _ := sendingApp("https://a.dev")
+	var told []bool
+	a.onLayout = func(right bool) { told = append(told, right) }
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("ping")
+	tt.Frame()
+	if err := tt.Click("Response on the Right"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.responseRight || !tt.HasText("Response Below") || len(told) != 1 || !a.dirty {
+		t.Fatalf("right %v, told %v", a.responseRight, told)
+	}
+	// Beside the request now: the response's text sits right of the URL's
+	// start rather than below the tabs.
+	url, _ := tt.Find("URL")
+	empty, _ := tt.Find("No response yet")
+	if empty.X < url.X+url.W/3 {
+		t.Errorf("the response isn't on the right: at %v, the URL at %v", empty, url)
+	}
+	if s := a.session(); !s.ResponseRight || s.SplitRight != 50 || s.Split != 45 {
+		t.Errorf("session %+v", s)
+	}
+}

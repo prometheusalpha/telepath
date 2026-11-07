@@ -98,6 +98,7 @@ go vet ./... && go test ./...
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.
 - Trạng thái mở/đóng folder nằm ở `a.files.Open`, chỉ chép sang `Folder.Open` lúc `flush` (lần ghi kế tiếp hoặc khi thoát app qua `OnBeforeQuit`).
+- Vị trí khu response (`a.responseRight`) và kích thước chia riêng của từng bố cục (`split` theo chiều dọc, `splitRight` theo chiều ngang) cũng lưu trong session. Nút đổi bố cục ở cuối hàng tab của request, và View menu có hai mục chọn; cả hai đều đi qua `setResponseRight`, hàm này gọi `a.onLayout` để cập nhật dấu tích trong menu.
 - Tab đang mở, tab đang chọn và kích thước hai thanh chia lưu trong `session.json`, cạnh `workspace.json`. File này được ghi cùng `flush`; mở/đóng/chuyển tab gọi `a.touch()` để kích hoạt auto-save mà không phải `reindex`. Đọc session lỗi thì bỏ qua (`LoadSession` trả session rỗng). Riêng thanh chia kéo xong chỉ được lưu theo lần ghi kế tiếp hoặc khi thoát.
 - `store.Load` lỗi thì app `log.Fatal` là cố ý: mở app với workspace trống thì lần sửa đầu tiên sẽ ghi đè mất file cũ.
 

@@ -58,6 +58,10 @@ type Session struct {
 	Active       int      `json:"active"`
 	SidebarWidth float32  `json:"sidebarWidth,omitempty"`
 	Split        float32  `json:"split,omitempty"` // the request's share above the response, in percent
+	// ResponseRight puts the response right of the request, which then
+	// takes SplitRight percent of the width.
+	ResponseRight bool    `json:"responseRight,omitempty"`
+	SplitRight    float32 `json:"splitRight,omitempty"`
 }
 
 // LoadSession returns a zero session for a missing or unreadable file: a

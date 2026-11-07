@@ -136,15 +136,37 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			a.send(tb)
 		}
 	})
-	ui.SplitVerticalPercent(c, &a.split, func() {
+	request := func() {
 		ui.Column(c).Fill().Children(func() {
-			ui.Tabs(c, &tb.reqTab, counted("Params", r.Query), counted("Path", r.Path),
-				counted("Headers", r.Headers), bodyLabel(&r.Body), authLabel(&r.Auth)).Padding(0, 12)
+			ui.Row(c).AlignItems(ui.Center).Padding(0, 12).Children(func() {
+				ui.Tabs(c, &tb.reqTab, counted("Params", r.Query), counted("Path", r.Path),
+					counted("Headers", r.Headers), bodyLabel(&r.Body), authLabel(&r.Auth)).MinWidth(0).Shrink(1)
+				ui.Spacer(c)
+				svg, label := splitRightIcon, "Response on the Right"
+				if a.responseRight {
+					svg, label = splitBelowIcon, "Response Below"
+				}
+				if iconButton(c, svg, label).Clicked() {
+					a.setResponseRight(!a.responseRight)
+				}
+			})
 			ui.Scroll(c).Grow(1).Children(func() { a.requestPane(c, tb, r) })
 		})
-	}, func() {
-		a.responseView(c, tb)
-	}).SplitReset(45).Grow(1)
+	}
+	response := func() { a.responseView(c, tb) }
+	if a.responseRight {
+		ui.SplitPercent(c, &a.splitRight, request, response).SplitReset(50).Grow(1)
+	} else {
+		ui.SplitVerticalPercent(c, &a.split, request, response).SplitReset(45).Grow(1)
+	}
+}
+
+func (a *app) setResponseRight(right bool) {
+	a.responseRight = right
+	if a.onLayout != nil {
+		a.onLayout(right)
+	}
+	a.touch()
 }
 
 func (a *app) responseView(c *ui.Context, tb *tab) {

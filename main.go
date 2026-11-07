@@ -72,9 +72,16 @@ type app struct {
 	saveErr error
 
 	tabs   []*tab
-	active int // -1 with no tab open
-	split  float32
-	client *http.Client
+	active int     // -1 with no tab open
+	split  float32 // the request's share above the response, in percent
+	// responseRight puts the response beside the request, which takes
+	// splitRight percent of the width; each layout keeps its own size.
+	responseRight bool
+	splitRight    float32
+	// onLayout tells the menu the response moved, as the button moves it
+	// too; nil in tests.
+	onLayout func(right bool)
+	client   *http.Client
 	// update runs fn on the main thread and redraws: the window's Update,
 	// or in tests whatever drives the Tester.
 	update func(fn func())
@@ -94,7 +101,7 @@ type app struct {
 }
 
 func newApp(ws *model.Workspace, path string) *app {
-	a := &app{ws: ws, path: path, row: -1, active: -1, split: 45, client: &http.Client{}, sidebarWidth: 240,
+	a := &app{ws: ws, path: path, row: -1, active: -1, split: 45, splitRight: 50, client: &http.Client{}, sidebarWidth: 240,
 		// Without a window there are no dialogs: main and tests set these.
 		pickFile: func(func(string)) {},
 		openFile: func(func(string, []byte)) {},
@@ -121,7 +128,8 @@ func (a *app) touch() {
 }
 
 func (a *app) session() store.Session {
-	s := store.Session{Active: a.active, SidebarWidth: a.sidebarWidth, Split: a.split}
+	s := store.Session{Active: a.active, SidebarWidth: a.sidebarWidth, Split: a.split,
+		ResponseRight: a.responseRight, SplitRight: a.splitRight}
 	for _, tb := range a.tabs {
 		s.Tabs = append(s.Tabs, tb.id)
 	}
@@ -142,6 +150,10 @@ func (a *app) restore(s store.Session) {
 	if s.Split > 0 {
 		a.split = s.Split
 	}
+	if s.SplitRight > 0 {
+		a.splitRight = s.SplitRight
+	}
+	a.responseRight = s.ResponseRight
 	a.dirty = false
 }
 
@@ -306,6 +318,11 @@ func main() {
 			}},
 			{Role: mygo.RoleEditMenu},
 			{Label: "View", Submenu: []*mygo.MenuItem{
+				{ID: "response-below", Label: "Response Below", Type: mygo.MenuItemRadio, Checked: !a.responseRight,
+					Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { a.setResponseRight(false) }) }},
+				{ID: "response-right", Label: "Response on the Right", Type: mygo.MenuItemRadio, Checked: a.responseRight,
+					Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { a.setResponseRight(true) }) }},
+				mygo.Separator(),
 				{Label: "Appearance", Submenu: []*mygo.MenuItem{
 					themeItem("theme-system", "System", model.ThemeSystem),
 					themeItem("theme-light", "Light", model.ThemeLight),
@@ -322,6 +339,10 @@ func main() {
 			for id, t := range map[string]string{"theme-system": model.ThemeSystem, "theme-light": model.ThemeLight, "theme-dark": model.ThemeDark} {
 				menu.ItemByID(id).SetChecked(t == theme)
 			}
+		}
+		a.onLayout = func(right bool) {
+			menu.ItemByID("response-below").SetChecked(!right)
+			menu.ItemByID("response-right").SetChecked(right)
 		}
 		// Before the window shows, so it opens in the saved appearance.
 		mygo.Theme.SetSource(themeSource(ws.Theme))
