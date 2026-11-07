@@ -193,3 +193,48 @@ func TestSessionComesBack(t *testing.T) {
 		t.Errorf("restored tabs %d, active %d, widths %v %v, dirty %v", len(b.tabs), b.active, b.sidebarWidth, b.split, b.dirty)
 	}
 }
+
+func TestShortcuts(t *testing.T) {
+	a := emptyApp()
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyN)
+	tt.Frame()
+	tt.Type("Users")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyN)
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if len(a.ws.Items) != 1 || a.ws.Items[0].Name != "Users" || len(a.ws.Items[0].Folder.Children) != 1 {
+		t.Fatalf("items %q", names(a.ws.Items))
+	}
+	ws := a.ws
+	for _, name := range []string{"two", "three"} {
+		ws.Add(model.NewRequest(name), "")
+	}
+	a.changed()
+	tt.Frame()
+	for _, name := range []string{"New Request", "two", "three"} {
+		tt.Click(name)
+		tt.Frame()
+	}
+	tt.Key(ui.Cmd, ui.Key1)
+	tt.Frame()
+	if a.active != 0 {
+		t.Errorf("⌘1: tab %d", a.active)
+	}
+	tt.Key(ui.Cmd, ui.Key9)
+	tt.Frame()
+	if a.active != 2 {
+		t.Errorf("⌘9: tab %d, want the last", a.active)
+	}
+	tt.Click("Collections")
+	tt.Key(ui.Cmd, ui.KeyL)
+	tt.Frame()
+	tt.Type("x")
+	tt.Frame()
+	if got := ws.Items[2].Request.URL; got != "x" {
+		t.Errorf("⌘L didn't focus the URL: %q", got)
+	}
+}

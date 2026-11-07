@@ -60,6 +60,8 @@ type app struct {
 	dropHint dropHint // where a drag over the sidebar would drop, last frame
 	dropNext dropHint // and this frame
 
+	urlHandle ui.Handle // the URL input, for ⌘L
+
 	renaming      string
 	renameDraft   string
 	renameFocused bool
@@ -230,7 +232,37 @@ func (a *app) view(c *ui.Context) {
 		c.Toast(a.toast)
 		a.toast = ""
 	}
+	a.shortcuts(c)
 	a.autosave(c)
+}
+
+// shortcuts are the window's keys. ⌘N and ⇧⌘N are the menu's too, which
+// takes them first in the app; the view's are for windows without that
+// menu, as tests'.
+func (a *app) shortcuts(c *ui.Context) {
+	switch {
+	case c.Shortcut(ui.Cmd, ui.KeyN):
+		a.newNode(model.NewRequest("New Request"))
+	case c.Shortcut(ui.Cmd|ui.Shift, ui.KeyN):
+		a.newNode(model.NewFolder("New Folder"))
+	case c.Shortcut(ui.Cmd, ui.KeyL) && a.current() != nil:
+		// Only with a URL showing: Focus waits for one otherwise, and would
+		// take the focus whenever a tab opens next.
+		a.urlHandle.Focus(c)
+	}
+	for i := range 9 {
+		if !c.Shortcut(ui.Cmd, ui.Key1+ui.Key(i)) || len(a.tabs) == 0 {
+			continue
+		}
+		// ⌘9 is the last tab, however many there are, as in browsers.
+		if i == 8 {
+			i = len(a.tabs) - 1
+		}
+		if i < len(a.tabs) {
+			a.active = i
+			a.touch()
+		}
+	}
 }
 
 // content is the card right of the sidebar; its top strip is where the
@@ -294,6 +326,13 @@ func main() {
 		menu := mygo.NewMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu},
 			{Label: "File", Submenu: []*mygo.MenuItem{
+				{Label: "New Request", Accelerator: "CmdOrCtrl+N", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(func() { a.newNode(model.NewRequest("New Request")) })
+				}},
+				{Label: "New Folder", Accelerator: "CmdOrCtrl+Shift+N", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(func() { a.newNode(model.NewFolder("New Folder")) })
+				}},
+				mygo.Separator(),
 				{Label: "Close Tab", Accelerator: "CmdOrCtrl+W", Click: func(*mygo.MenuItem, *mygo.Window) {
 					win.Update(func() { a.closeTab(a.active) })
 				}},

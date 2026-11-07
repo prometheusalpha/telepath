@@ -116,7 +116,7 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			a.changed()
 		}
 		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).
-			Placeholder("{{base}}/users").Label("URL")
+			Placeholder("{{base}}/users").Label("URL").Bind(&a.urlHandle)
 		if a.highlightVars(c, url, r.URL) {
 			url.Tooltip(a.env.Expand(r.URL, nil))
 		}

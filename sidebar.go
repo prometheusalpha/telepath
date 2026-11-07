@@ -67,11 +67,11 @@ func (a *app) sidebar(c *ui.Context) {
 				}
 			})
 			iconButton(c, plusIcon, "New").Menu(func(m *ui.Menu) {
-				if m.Item("New Request").Chosen() {
-					a.create(model.NewRequest("New Request"), a.selected)
+				if m.Item("New Request").Shortcut(ui.Cmd, ui.KeyN).Chosen() {
+					a.newNode(model.NewRequest("New Request"))
 				}
-				if m.Item("New Folder").Chosen() {
-					a.create(model.NewFolder("New Folder"), a.selected)
+				if m.Item("New Folder").Shortcut(ui.Cmd|ui.Shift, ui.KeyN).Chosen() {
+					a.newNode(model.NewFolder("New Folder"))
 				}
 			})
 		})
@@ -355,6 +355,11 @@ func (a *app) finishRename(c *ui.Context, n *model.Node, keep bool) {
 
 func (a *app) confirmDelete(n *model.Node) {
 	a.deleting, a.askDelete = n, true
+}
+
+// newNode adds n where the sidebar's choice is, as the + menu does.
+func (a *app) newNode(n *model.Node) {
+	a.create(n, a.selected)
 }
 
 // create adds n inside the folder at, or beside the request at, and lets
