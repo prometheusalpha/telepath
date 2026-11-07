@@ -23,7 +23,7 @@ func (a *app) highlightVars(c *ui.Context, in ui.Element, text string) bool {
 	for _, r := range refs {
 		color := t.Danger
 		if _, ok := a.env[r.Name]; ok {
-			color = t.Accent
+			color = accentInk(t)
 		}
 		in.TextRanges(ui.TextRange{Start: r.Start, End: r.End, Color: color, Weight: 600})
 	}
@@ -31,25 +31,39 @@ func (a *app) highlightVars(c *ui.Context, in ui.Element, text string) bool {
 }
 
 func (a *app) sidebarFooter(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c).Shrink(0).Padding(8).Children(func() {
-		b := ui.ButtonBase(c).Gap(8).AlignItems(ui.Center).Padding(6, 8).Radius(7).Grow(1).
-			TextColor(t.TextMuted).Label("Variables").Tooltip("⌘E")
-		if b.Hovered() {
-			b.Background(t.SurfaceHover.Alpha(0.6)).TextColor(t.Text)
+	ui.Column(c).Shrink(0).Padding(8).Gap(2).Children(func() {
+		th := themeOf(a.ws.Theme)
+		if footerButton(c, th.icon, "Appearance", th.label).Label("Appearance: " + th.label).Clicked() {
+			a.setTheme(nextTheme(a.ws.Theme))
 		}
-		b.Children(func() {
-			ui.Icon(c, braceIcon).Size(14, 14)
-			ui.Text(c, "Variables").FontSize(13)
-			ui.Spacer(c)
-			if n := len(a.env); n > 0 {
-				ui.Text(c, fmt.Sprint(n)).FontSize(11).TextColor(t.TextMuted)
-			}
-		})
-		if b.Clicked() {
+		count := ""
+		if n := len(a.env); n > 0 {
+			count = fmt.Sprint(n)
+		}
+		if footerButton(c, braceIcon, "Variables", count).Tooltip("⌘E").Clicked() {
 			a.envOpen = true
 		}
 	})
+}
+
+// footerButton is a row of the sidebar's footer: an icon, a name, and on
+// the right what it is set to.
+func footerButton(c *ui.Context, svg *ui.SVG, name, value string) ui.Element {
+	t := c.Theme()
+	b := ui.ButtonBase(c).Gap(8).AlignItems(ui.Center).Padding(6, 8).Radius(7).
+		TextColor(t.TextMuted).Label(name)
+	if b.Hovered() {
+		b.Background(t.SurfaceHover.Alpha(0.6)).TextColor(t.Text)
+	}
+	b.Children(func() {
+		ui.Icon(c, svg).Size(14, 14)
+		ui.Text(c, name).FontSize(13)
+		ui.Spacer(c)
+		if value != "" {
+			ui.Text(c, value).FontSize(11).TextColor(t.TextMuted)
+		}
+	})
+	return b
 }
 
 func (a *app) envModal(c *ui.Context) {

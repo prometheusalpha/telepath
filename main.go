@@ -53,6 +53,9 @@ type app struct {
 	// update runs fn on the main thread and redraws: the window's Update,
 	// or in tests whatever drives the Tester.
 	update func(fn func())
+	// setAppearance makes the app light, dark or follow the system, menus
+	// and window materials too; nil in tests, which set the Tester's.
+	setAppearance func(theme string)
 	// pickFile asks for a file and gives its path to done, on the main
 	// thread, unless canceled.
 	pickFile func(done func(path string))
@@ -163,6 +166,16 @@ func (a *app) content(c *ui.Context) {
 	})
 }
 
+func themeSource(theme string) mygo.ThemeSource {
+	switch theme {
+	case model.ThemeLight:
+		return mygo.ThemeLight
+	case model.ThemeDark:
+		return mygo.ThemeDark
+	}
+	return mygo.ThemeSystem
+}
+
 func main() {
 	mygo.App.WhenReady(func() {
 		dir, err := mygo.App.Path(mygo.PathUserData)
@@ -182,8 +195,12 @@ func main() {
 			}
 		})
 		var win *mygo.Window
+		themeItem := func(id, label, theme string) *mygo.MenuItem {
+			return &mygo.MenuItem{ID: id, Label: label, Type: mygo.MenuItemRadio, Checked: ws.Theme == theme,
+				Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { a.setTheme(theme) }) }}
+		}
 		// The default menu's Close Window would take ⌘W from the tabs.
-		mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
+		menu := mygo.NewMenu([]*mygo.MenuItem{
 			{Role: mygo.RoleAppMenu},
 			{Label: "File", Submenu: []*mygo.MenuItem{
 				{Label: "Close Tab", Accelerator: "CmdOrCtrl+W", Click: func(*mygo.MenuItem, *mygo.Window) {
@@ -196,8 +213,26 @@ func main() {
 				}},
 			}},
 			{Role: mygo.RoleEditMenu},
+			{Label: "View", Submenu: []*mygo.MenuItem{
+				{Label: "Appearance", Submenu: []*mygo.MenuItem{
+					themeItem("theme-system", "System", model.ThemeSystem),
+					themeItem("theme-light", "Light", model.ThemeLight),
+					themeItem("theme-dark", "Dark", model.ThemeDark),
+				}},
+			}},
 			{Role: mygo.RoleWindowMenu},
-		}))
+		})
+		mygo.App.SetMenu(menu)
+		a.setAppearance = func(theme string) {
+			mygo.Theme.SetSource(themeSource(theme))
+			// The sidebar's button changes it too, so the radio items are
+			// set here rather than left to the menu.
+			for id, t := range map[string]string{"theme-system": model.ThemeSystem, "theme-light": model.ThemeLight, "theme-dark": model.ThemeDark} {
+				menu.ItemByID(id).SetChecked(t == theme)
+			}
+		}
+		// Before the window shows, so it opens in the saved appearance.
+		mygo.Theme.SetSource(themeSource(ws.Theme))
 		win = mygo.NewWindow(mygo.WindowOptions{
 			Title:          "telepath",
 			Width:          1200,

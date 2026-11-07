@@ -173,7 +173,7 @@ func statusColor(t *ui.Theme, code int) ui.Color {
 	case code >= 400:
 		return t.Warning
 	case code >= 300:
-		return t.Accent
+		return accentInk(t)
 	}
 	return t.Success
 }

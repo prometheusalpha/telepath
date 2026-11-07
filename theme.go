@@ -1,6 +1,10 @@
 package main
 
-import "github.com/egoist/mygo/ui"
+import (
+	"github.com/egoist/mygo/ui"
+
+	"telepath/internal/model"
+)
 
 // Built once: c.Theme() starts every frame as the system's light or dark
 // theme, and the view swaps in the matching one of these.
@@ -32,12 +36,59 @@ func newTheme(t *ui.Theme) *ui.Theme {
 	return t
 }
 
+type themeChoice struct {
+	theme, label string
+	icon         *ui.SVG
+}
+
+var themes = []themeChoice{
+	{model.ThemeSystem, "System", icon(`<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" fill="currentColor"/>`)},
+	{model.ThemeLight, "Light", icon(`<circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/>`)},
+	{model.ThemeDark, "Dark", icon(`<path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5z"/>`)},
+}
+
+func (a *app) setTheme(theme string) {
+	a.ws.Theme = theme
+	if a.setAppearance != nil {
+		a.setAppearance(theme)
+	}
+	a.changed()
+}
+
+// nextTheme is the theme the sidebar's button goes to, round the three.
+func nextTheme(theme string) string {
+	for i, th := range themes {
+		if th.theme == theme {
+			return themes[(i+1)%len(themes)].theme
+		}
+	}
+	return model.ThemeSystem
+}
+
+func themeOf(theme string) themeChoice {
+	for _, th := range themes {
+		if th.theme == theme {
+			return th
+		}
+	}
+	return themes[0]
+}
+
 func applyTheme(c *ui.Context) {
 	if c.Theme().Dark {
 		c.SetTheme(darkTheme)
 	} else {
 		c.SetTheme(lightTheme)
 	}
+}
+
+// accentInk is the accent for text and icons on the card: the light
+// theme's teal is a fill color, too pale to read on white.
+func accentInk(t *ui.Theme) ui.Color {
+	if t.Dark {
+		return t.Accent
+	}
+	return ui.Oklch(0.5, 0.1, 190)
 }
 
 // sidebarColor is the sidebar's fill where no window material shows.

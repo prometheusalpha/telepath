@@ -67,7 +67,7 @@ func (a *app) kvTable(c *ui.Context, rows *[]model.KV, draft *model.KV, o kvOpti
 					}
 					b := iconButton(c, svg, label)
 					if kv.Secret {
-						b.TextColor(t.Accent)
+						b.TextColor(accentInk(t))
 					}
 					if b.Clicked() {
 						kv.Secret, changed = !kv.Secret, true

@@ -13,8 +13,15 @@ const Version = 1
 type Workspace struct {
 	Version int     `json:"version"`
 	Items   []*Node `json:"items"`
-	Env     []KV    `json:"env,omitempty"` // the one set of variables
+	Env     []KV    `json:"env,omitempty"`   // the one set of variables
+	Theme   string  `json:"theme,omitempty"` // ThemeSystem, ThemeLight or ThemeDark
 }
+
+const (
+	ThemeSystem = ""
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+)
 
 // Node is a folder or a request: exactly one of Folder and Request is set.
 type Node struct {

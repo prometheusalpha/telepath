@@ -28,6 +28,8 @@ go vet ./... && go test ./...
 
 ### Theme
 - `c.Theme()` mỗi frame bắt đầu lại từ theme light/dark của hệ thống. `applyTheme` chọn một trong hai theme dựng sẵn (`lightTheme`/`darkTheme`) theo `Dark`; đừng copy theme mới mỗi frame.
+- Đổi System/Light/Dark bằng `mygo.Theme.SetSource` (qua `a.setAppearance`) để vibrancy, menu, title bar và `c.Theme()` cùng đổi; không tự ép `darkTheme` trong view. Lựa chọn lưu ở `Workspace.Theme` và được áp dụng trước khi tạo cửa sổ. Dấu tích ở View > Appearance được set tay trong `setAppearance`, vì nút ở sidebar cũng đổi được.
+- Teal của theme sáng chỉ dùng làm nền; chữ hoặc icon màu accent nằm trên card thì dùng `accentInk(t)` (teal đậm hơn ở theme sáng).
 - Accent teal sáng, nên `AccentText` là màu tối. Phần tử nằm trên dòng đang chọn (nền accent) phải tự đổi sang `t.AccentText`: icon folder, chevron, badge method. Ngược lại, ô input đặt trong dòng đó phải set `TextColor(t.Text)`, nếu không sẽ kế thừa màu tối trên nền tối.
 
 ### Sidebar (`ui.Outline`)
