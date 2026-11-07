@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -70,15 +73,137 @@ func NormalizeURL(raw string) string {
 	return "http://" + raw
 }
 
+// ResolveURL fills the :name segments and escapes the query, which the
+// app keeps as typed.
+func ResolveURL(r *model.Request) string {
+	base, q := model.SplitURL(NormalizeURL(r.URL))
+	// Whole segments of the path only, so neither ":idx" for :id nor the
+	// port after the host is taken for one.
+	if i := strings.Index(base, "://"); i >= 0 {
+		if j := strings.IndexByte(base[i+3:], '/'); j >= 0 {
+			host, segs := base[:i+3+j], strings.Split(base[i+3+j:], "/")
+			for k, seg := range segs {
+				if p, ok := pathValue(r.Path, seg); ok {
+					segs[k] = url.PathEscape(p)
+				}
+			}
+			base = host + strings.Join(segs, "/")
+		}
+	}
+	var parts []string
+	for _, kv := range model.ParseQuery(q) {
+		part := url.QueryEscape(unescape(kv.Key))
+		if kv.Value != "" {
+			part += "=" + url.QueryEscape(unescape(kv.Value))
+		}
+		parts = append(parts, part)
+	}
+	if len(parts) > 0 {
+		base += "?" + strings.Join(parts, "&")
+	}
+	return base
+}
+
+func pathValue(path []model.KV, seg string) (string, bool) {
+	if len(seg) < 2 || seg[0] != ':' {
+		return "", false
+	}
+	for _, p := range path {
+		if p.Key == seg[1:] {
+			return p.Value, true
+		}
+	}
+	return "", false
+}
+
+// unescape takes back what the user escaped by hand, so it isn't escaped
+// twice; text that isn't valid escaping goes as it is.
+func unescape(s string) string {
+	if u, err := url.QueryUnescape(s); err == nil {
+		return u
+	}
+	return s
+}
+
 func Build(ctx context.Context, r *model.Request) (*http.Request, error) {
-	u, err := url.Parse(NormalizeURL(r.URL))
+	u, err := url.Parse(ResolveURL(r))
 	if err != nil {
 		return nil, err
 	}
 	if u.Host == "" {
 		return nil, fmt.Errorf("the URL has no host")
 	}
-	return http.NewRequestWithContext(ctx, r.Method, u.String(), nil)
+	body, contentType, err := encodeBody(&r.Body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, r.Method, u.String(), body)
+	if err != nil {
+		return nil, err
+	}
+	for _, h := range r.Headers {
+		if h.Enabled && h.Key != "" {
+			req.Header.Add(h.Key, h.Value)
+		}
+	}
+	// A Content-Type the user set wins, even over a multipart boundary.
+	if contentType != "" && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	return req, nil
+}
+
+func encodeBody(b *model.Body) (io.Reader, string, error) {
+	switch b.Kind {
+	case model.BodyJSON:
+		return strings.NewReader(b.Text), "application/json", nil
+	case model.BodyText:
+		return strings.NewReader(b.Text), "text/plain; charset=utf-8", nil
+	case model.BodyForm:
+		var parts []string
+		for _, kv := range b.Form {
+			if kv.Enabled && kv.Key != "" {
+				parts = append(parts, url.QueryEscape(kv.Key)+"="+url.QueryEscape(kv.Value))
+			}
+		}
+		return strings.NewReader(strings.Join(parts, "&")), "application/x-www-form-urlencoded", nil
+	case model.BodyMultipart:
+		var buf bytes.Buffer
+		w := multipart.NewWriter(&buf)
+		for _, kv := range b.Form {
+			if !kv.Enabled || kv.Key == "" {
+				continue
+			}
+			if !kv.File {
+				if err := w.WriteField(kv.Key, kv.Value); err != nil {
+					return nil, "", err
+				}
+				continue
+			}
+			if err := writeFile(w, kv.Key, kv.Value); err != nil {
+				return nil, "", err
+			}
+		}
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return &buf, w.FormDataContentType(), nil
+	}
+	return nil, "", nil
+}
+
+func writeFile(w *multipart.Writer, field, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("field %q: %w", field, err)
+	}
+	defer f.Close()
+	part, err := w.CreateFormFile(field, filepath.Base(path))
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, f)
+	return err
 }
 
 func Send(ctx context.Context, client *http.Client, r *model.Request) (*Response, error) {

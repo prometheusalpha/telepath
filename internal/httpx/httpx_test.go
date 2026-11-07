@@ -2,8 +2,11 @@ package httpx
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,5 +57,71 @@ func TestNormalizeURL(t *testing.T) {
 	}
 	if _, err := Build(context.Background(), &model.Request{Method: "GET", URL: "http://"}); err == nil || !strings.Contains(err.Error(), "host") {
 		t.Errorf("no host: %v", err)
+	}
+}
+
+func TestResolveURL(t *testing.T) {
+	r := &model.Request{
+		URL:  "localhost:8080/users/:id/:idx?q=a b&tag=x%2Fy&flag",
+		Path: []model.KV{{Key: "id", Value: "a/b"}, {Key: "idx", Value: "2"}},
+	}
+	want := "http://localhost:8080/users/a%2Fb/2?q=a+b&tag=x%2Fy&flag"
+	if got := ResolveURL(r); got != want {
+		t.Errorf("ResolveURL = %q, want %q", got, want)
+	}
+}
+
+func TestBodies(t *testing.T) {
+	var got struct{ ct, body, hdr string }
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		got.ct, got.body, got.hdr = r.Header.Get("Content-Type"), string(b), r.Header.Get("X-Token")
+	}))
+	defer srv.Close()
+	send := func(r *model.Request) {
+		t.Helper()
+		r.Method, r.URL = "POST", srv.URL
+		if _, err := Send(context.Background(), srv.Client(), r); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	send(&model.Request{
+		Headers: []model.KV{{Key: "X-Token", Value: "t", Enabled: true}, {Key: "X-Off", Value: "x"}},
+		Body:    model.Body{Kind: model.BodyJSON, Text: `{"a":1}`},
+	})
+	if got.ct != "application/json" || got.body != `{"a":1}` || got.hdr != "t" {
+		t.Errorf("json: %+v", got)
+	}
+
+	send(&model.Request{
+		Headers: []model.KV{{Key: "Content-Type", Value: "application/vnd.api+json", Enabled: true}},
+		Body:    model.Body{Kind: model.BodyJSON, Text: `{}`},
+	})
+	if got.ct != "application/vnd.api+json" {
+		t.Errorf("the user's Content-Type was replaced by %q", got.ct)
+	}
+
+	send(&model.Request{Body: model.Body{Kind: model.BodyForm, Form: []model.KV{
+		{Key: "name", Value: "Ada L", Enabled: true}, {Key: "off", Value: "x"},
+	}}})
+	if got.ct != "application/x-www-form-urlencoded" || got.body != "name=Ada+L" {
+		t.Errorf("form: %+v", got)
+	}
+
+	path := filepath.Join(t.TempDir(), "note.txt")
+	os.WriteFile(path, []byte("hello file"), 0o644)
+	send(&model.Request{Body: model.Body{Kind: model.BodyMultipart, Form: []model.KV{
+		{Key: "title", Value: "x", Enabled: true}, {Key: "doc", Value: path, Enabled: true, File: true},
+	}}})
+	if !strings.HasPrefix(got.ct, "multipart/form-data; boundary=") ||
+		!strings.Contains(got.body, `filename="note.txt"`) || !strings.Contains(got.body, "hello file") {
+		t.Errorf("multipart: %+v", got)
+	}
+
+	_, err := Send(context.Background(), srv.Client(), &model.Request{Method: "POST", URL: srv.URL,
+		Body: model.Body{Kind: model.BodyMultipart, Form: []model.KV{{Key: "doc", Value: "/nope", Enabled: true, File: true}}}})
+	if err == nil || !strings.Contains(err.Error(), `"doc"`) {
+		t.Errorf("missing file: %v", err)
 	}
 }

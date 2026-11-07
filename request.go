@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 
 	"telepath/internal/httpx"
+	"telepath/internal/model"
 )
 
 var methods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
@@ -19,6 +23,10 @@ type tab struct {
 	id      string
 	reqTab  int
 	respTab int
+
+	// drafts are the blank rows of the tables, by table.
+	drafts   map[string]*model.KV
+	bodyEdit *editor.State
 
 	sending bool
 	cancel  context.CancelFunc
@@ -46,13 +54,13 @@ func (a *app) send(tb *tab) {
 	}
 	tb.stop()
 	// The goroutine reads a copy: the user may keep editing meanwhile.
-	req := *n.Request
+	req := n.Request.Clone()
 	ctx, cancel := context.WithCancel(context.Background())
 	tb.sending, tb.cancel, tb.err = true, cancel, nil
 	seq := tb.seq
 	client := a.client
 	go func() {
-		resp, err := httpx.Send(ctx, client, &req)
+		resp, err := httpx.Send(ctx, client, req)
 		a.update(func() {
 			if tb.seq != seq {
 				return
@@ -91,6 +99,8 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).
 			Placeholder("https://api.example.com/users").Label("URL")
 		if url.Changed() {
+			r.QueryFromURL()
+			r.PathFromURL()
 			a.changed()
 		}
 		if url.Submitted() {
@@ -106,8 +116,9 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 	})
 	ui.SplitVerticalPercent(c, &a.split, func() {
 		ui.Column(c).Fill().Children(func() {
-			ui.Tabs(c, &tb.reqTab, "Params", "Headers", "Body", "Auth").Padding(0, 12)
-			emptyState(c, "Nothing here yet", "")
+			ui.Tabs(c, &tb.reqTab, counted("Params", r.Query), counted("Path", r.Path),
+				counted("Headers", r.Headers), bodyLabel(&r.Body), "Auth").Padding(0, 12)
+			ui.Scroll(c).Grow(1).Children(func() { a.requestPane(c, tb, r) })
 		})
 	}, func() {
 		a.responseView(c, tb)
@@ -182,5 +193,119 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 				ui.Text(c, h.Value).Font(mono).FontSize(12).Selectable()
 			}
 		}).Grow(1)
+	}
+}
+
+// counted adds how many rows are on to a tab's label, as "Headers 2".
+func counted(label string, rows []model.KV) string {
+	n := 0
+	for _, kv := range rows {
+		if kv.Enabled && kv.Key != "" {
+			n++
+		}
+	}
+	if n == 0 {
+		return label
+	}
+	return fmt.Sprintf("%s %d", label, n)
+}
+
+var bodyKinds = []string{model.BodyNone, model.BodyJSON, model.BodyText, model.BodyForm, model.BodyMultipart}
+
+func bodyLabel(b *model.Body) string {
+	if b.Kind == model.BodyNone {
+		return "Body"
+	}
+	return "Body •"
+}
+
+func (tb *tab) draft(name string) *model.KV {
+	if tb.drafts == nil {
+		tb.drafts = map[string]*model.KV{}
+	}
+	d := tb.drafts[name]
+	if d == nil {
+		d = &model.KV{}
+		tb.drafts[name] = d
+	}
+	return d
+}
+
+func (a *app) requestPane(c *ui.Context, tb *tab, r *model.Request) {
+	switch tb.reqTab {
+	case 0:
+		if a.kvTable(c, &r.Query, tb.draft("query"), kvOptions{name: "Query"}) {
+			r.URLFromQuery()
+			a.changed()
+		}
+	case 1:
+		if a.kvTable(c, &r.Path, nil, kvOptions{name: "Path", fixedKeys: true}) {
+			a.changed()
+		}
+	case 2:
+		if a.kvTable(c, &r.Headers, tb.draft("headers"), kvOptions{name: "Header", suggestions: commonHeaders}) {
+			a.changed()
+		}
+	case 3:
+		a.bodyPane(c, tb, r)
+	case 4:
+		emptyState(c, "No auth", "")
+	}
+}
+
+func (a *app) bodyPane(c *ui.Context, tb *tab, r *model.Request) {
+	t := c.Theme()
+	kind := slices.Index(bodyKinds, r.Body.Kind)
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(8, 12).Children(func() {
+		if ui.Segmented(c, &kind, "None", "JSON", "Text", "Form", "Multipart").Label("Body type").Changed() {
+			r.Body.Kind = bodyKinds[kind]
+			if tb.bodyEdit != nil {
+				setBodyLanguage(tb.bodyEdit, r.Body.Kind)
+			}
+			a.changed()
+		}
+		ui.Spacer(c)
+		if r.Body.Kind == model.BodyJSON && ui.Button(c, "Format").FontSize(12).Clicked() {
+			var out bytes.Buffer
+			if err := json.Indent(&out, []byte(r.Body.Text), "", "  "); err != nil {
+				c.Toast("Not valid JSON: " + err.Error())
+			} else {
+				a.bodyEditor(tb, r).Buffer.Set(out.String())
+			}
+		}
+	})
+	switch r.Body.Kind {
+	case model.BodyNone:
+		ui.Text(c, "This request has no body.").FontSize(12).TextColor(t.TextMuted).Padding(4, 12)
+	case model.BodyJSON, model.BodyText:
+		st := a.bodyEditor(tb, r)
+		editor.View(c, st).Height(260).FillWidth().Label("Request body")
+		if text := st.Buffer.String(); text != r.Body.Text {
+			r.Body.Text = text
+			a.changed()
+		}
+	case model.BodyForm, model.BodyMultipart:
+		multi := r.Body.Kind == model.BodyMultipart
+		if a.kvTable(c, &r.Body.Form, tb.draft("form"), kvOptions{name: "Field", files: multi}) {
+			a.changed()
+		}
+	}
+}
+
+// bodyEditor is made from the request's text the first time the body
+// shows; from then on the editor's buffer leads and the request follows.
+func (a *app) bodyEditor(tb *tab, r *model.Request) *editor.State {
+	if tb.bodyEdit == nil {
+		tb.bodyEdit = &editor.State{Buffer: editor.NewBuffer(r.Body.Text), NoScrollPastEnd: true}
+		setBodyLanguage(tb.bodyEdit, r.Body.Kind)
+	}
+	return tb.bodyEdit
+}
+
+func setBodyLanguage(st *editor.State, kind string) {
+	if kind == model.BodyJSON {
+		st.Buffer.SetLanguage(editor.LanguageNamed("JSON"))
+	} else {
+		st.Buffer.SetLanguage(nil)
 	}
 }

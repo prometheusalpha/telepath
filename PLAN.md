@@ -140,7 +140,8 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - **Body:** segmented chọn kiểu `none | JSON | Text | Form URL-encoded | Multipart`.
   - JSON/Text: code editor (JSON có highlight + nút Format).
   - Form/Multipart: KVTable; multipart cho phép value là file (chọn bằng `mygo.Dialog.Open`).
-  - Tự set `Content-Type` nếu người dùng chưa đặt.
+  - Tự set `Content-Type` nếu người dùng chưa đặt (header người dùng tự đặt luôn thắng).
+- Path là tab riêng; chỉ sửa value, key lấy từ URL.
 
 **Xong khi:** gửi được request có query, path param, header, body JSON và form.
 

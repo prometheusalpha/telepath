@@ -17,6 +17,10 @@ func (a *app) openTab(id string) {
 		a.active = i
 		return
 	}
+	// Requests saved before Query and Path existed get them from the URL.
+	r := a.tree.byID[id].Request
+	r.QueryFromURL()
+	r.PathFromURL()
 	a.tabs = append(a.tabs, &tab{id: id})
 	a.active = len(a.tabs) - 1
 }

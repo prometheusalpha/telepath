@@ -19,8 +19,9 @@ go vet ./... && go test ./...
 
 - `internal/model`: workspace, cây `Node` (đúng một trong `Folder`/`Request` khác nil), Add/Remove/Duplicate. Không phụ thuộc UI.
 - `internal/store`: đọc/ghi `workspace.json`, ghi qua file `.tmp` rồi rename.
-- `internal/httpx`: dựng `http.Request` từ model, gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- `internal/model/url.go`: đồng bộ URL ↔ Query, nhận diện `:name` trong path.
+- `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
+- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
 
 ## Gotchas
 
@@ -41,6 +42,15 @@ go vet ./... && go test ./...
 - Gửi request chạy trong goroutine, đọc một bản copy của `model.Request`, rồi trả kết quả qua `a.update` (= `win.Update` khi chạy app thật). Mỗi lần gửi hoặc cancel thì tăng `tab.seq`; response về mà `seq` không khớp thì bỏ qua (response muộn của lần đã cancel).
 - Sửa model ở đâu cũng phải `a.changed()`, kể cả Select/URL (`Changed()`). `changed()` còn đóng tab của request đã bị xoá (`pruneTabs`).
 - Menu mặc định của macOS gắn ⌘W cho Close Window. App tự `SetMenu` để ⌘W là Close Tab, còn Close Window chuyển sang ⇧⌘W. Muốn thêm phím tắt cấp app thì sửa menu này.
+
+### Params, Path, bảng key/value
+- `Request.URL` giữ nguyên chữ người dùng gõ, có cả các query đang bật; `Query` giữ thêm các dòng đã tắt (URL không thể hiện được). Sửa URL thì `QueryFromURL` + `PathFromURL`; sửa bảng Params thì `URLFromQuery`. Không escape gì trong model, chỉ escape lúc gửi (`httpx.ResolveURL`), nên `{{var}}` và chữ có dấu cách vẫn hiện y như gõ.
+- `PathNames` bỏ qua phần host, nên cổng trong `localhost:8080` không bị coi là `:name`.
+- `kvTable`: dòng trống cuối bảng gắn với `draft` (nằm trong `tab.drafts`). Vừa gõ ký tự đầu là draft thành dòng thật; dòng đó được gán `c.Key(i)` bằng đúng key của dòng trống trước đó, nhờ vậy ô nhập vẫn giữ focus. Đừng đổi cách đặt key này.
+- Label của từng ô là duy nhất (`"Query key 1"`, `"Header new key"`…) để test bấm vào được.
+- Content-Type người dùng tự đặt luôn thắng, kể cả với multipart (dù như vậy là mất boundary).
+- `mygo.Dialog.Open` chờ người dùng chọn xong mới trả về, nên phải gọi trong goroutine rồi trả kết quả qua `win.Update` (`a.pickFile`). Callback ghi đường dẫn vào dòng theo vị trí và chỉ ghi nếu key ở đó chưa đổi, vì trong lúc dialog mở các dòng có thể đã bị thêm hoặc xoá.
+- Body JSON/Text: buffer của editor (`tab.bodyEdit`) là nguồn chính; mỗi frame so `Buffer.String()` với `Body.Text` rồi chép sang. Chỉ gọi `SetLanguage` khi đổi kiểu body.
 
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.

@@ -48,6 +48,9 @@ type app struct {
 	// update runs fn on the main thread and redraws: the window's Update,
 	// or in tests whatever drives the Tester.
 	update func(fn func())
+	// pickFile asks for a file and gives its path to done, on the main
+	// thread, unless canceled.
+	pickFile func(done func(path string))
 
 	sidebarWidth float32
 }
@@ -196,6 +199,15 @@ func main() {
 			Content:        ui.View(a.view),
 		})
 		a.update = win.Update
+		a.pickFile = func(done func(string)) {
+			// Open waits for the user, so it can't run on the main thread.
+			go func() {
+				paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: win, Title: "Choose a File"})
+				if err == nil && len(paths) > 0 {
+					win.Update(func() { done(paths[0]) })
+				}
+			}()
+		}
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)

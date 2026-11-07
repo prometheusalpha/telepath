@@ -30,7 +30,44 @@ type Folder struct {
 
 type Request struct {
 	Method string `json:"method"`
-	URL    string `json:"url"`
+	// URL is as typed, with the enabled query parameters in it; Query also
+	// keeps those disabled, which the URL leaves out.
+	URL     string `json:"url"`
+	Query   []KV   `json:"query,omitempty"`
+	Path    []KV   `json:"path,omitempty"` // the values of the URL's :name segments
+	Headers []KV   `json:"headers,omitempty"`
+	Body    Body   `json:"body"`
+}
+
+type KV struct {
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	Enabled bool   `json:"enabled"`
+	// File makes Value a path whose file a multipart body sends.
+	File bool `json:"file,omitempty"`
+}
+
+const (
+	BodyNone      = ""
+	BodyJSON      = "json"
+	BodyText      = "text"
+	BodyForm      = "form"
+	BodyMultipart = "multipart"
+)
+
+type Body struct {
+	Kind string `json:"kind,omitempty"`
+	Text string `json:"text,omitempty"` // JSON and text bodies
+	Form []KV   `json:"form,omitempty"` // form and multipart bodies
+}
+
+func (r *Request) Clone() *Request {
+	cp := *r
+	cp.Query = slices.Clone(r.Query)
+	cp.Path = slices.Clone(r.Path)
+	cp.Headers = slices.Clone(r.Headers)
+	cp.Body.Form = slices.Clone(r.Body.Form)
+	return &cp
 }
 
 func NewID() string {
@@ -120,8 +157,7 @@ func (w *Workspace) Duplicate(id string) *Node {
 func clone(n *Node) *Node {
 	cp := &Node{ID: NewID(), Name: n.Name}
 	if n.Request != nil {
-		r := *n.Request
-		cp.Request = &r
+		cp.Request = n.Request.Clone()
 	}
 	if n.Folder != nil {
 		cp.Folder = &Folder{Children: make([]*Node, 0, len(n.Folder.Children)), Open: n.Folder.Open}
