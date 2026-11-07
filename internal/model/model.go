@@ -37,6 +37,7 @@ type Request struct {
 	Path    []KV   `json:"path,omitempty"` // the values of the URL's :name segments
 	Headers []KV   `json:"headers,omitempty"`
 	Body    Body   `json:"body"`
+	Auth    Auth   `json:"auth"`
 }
 
 type KV struct {
@@ -59,6 +60,25 @@ type Body struct {
 	Kind string `json:"kind,omitempty"`
 	Text string `json:"text,omitempty"` // JSON and text bodies
 	Form []KV   `json:"form,omitempty"` // form and multipart bodies
+}
+
+const (
+	AuthNone   = ""
+	AuthBasic  = "basic"
+	AuthBearer = "bearer"
+	AuthAPIKey = "apikey"
+)
+
+// Auth fields are kept for every kind, so switching kinds and back loses
+// nothing typed.
+type Auth struct {
+	Kind     string `json:"kind,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Token    string `json:"token,omitempty"`
+	Key      string `json:"key,omitempty"`   // API key's header or query name
+	Value    string `json:"value,omitempty"` // and its value
+	InQuery  bool   `json:"inQuery,omitempty"`
 }
 
 func (r *Request) Clone() *Request {

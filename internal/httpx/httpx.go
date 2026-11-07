@@ -150,7 +150,41 @@ func Build(ctx context.Context, r *model.Request) (*http.Request, error) {
 	if contentType != "" && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	applyAuth(req, &r.Auth)
 	return req, nil
+}
+
+// applyAuth leaves alone what the user set by hand: a header of the same
+// name, or a query parameter, wins over the Auth tab.
+func applyAuth(req *http.Request, a *model.Auth) {
+	switch a.Kind {
+	case model.AuthBasic:
+		if req.Header.Get("Authorization") == "" {
+			req.SetBasicAuth(a.Username, a.Password)
+		}
+	case model.AuthBearer:
+		if a.Token != "" && req.Header.Get("Authorization") == "" {
+			req.Header.Set("Authorization", "Bearer "+a.Token)
+		}
+	case model.AuthAPIKey:
+		if a.Key == "" {
+			return
+		}
+		if !a.InQuery {
+			if req.Header.Get(a.Key) == "" {
+				req.Header.Set(a.Key, a.Value)
+			}
+			return
+		}
+		// Appended to the raw query, which Query().Encode() would reorder.
+		if !req.URL.Query().Has(a.Key) {
+			pair := url.QueryEscape(a.Key) + "=" + url.QueryEscape(a.Value)
+			if req.URL.RawQuery != "" {
+				pair = "&" + pair
+			}
+			req.URL.RawQuery += pair
+		}
+	}
 }
 
 func encodeBody(b *model.Body) (io.Reader, string, error) {

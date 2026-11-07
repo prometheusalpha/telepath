@@ -27,6 +27,7 @@ type tab struct {
 	// drafts are the blank rows of the tables, by table.
 	drafts   map[string]*model.KV
 	bodyEdit *editor.State
+	reveal   bool // shows the password, token or key typed in the Auth tab
 
 	sending bool
 	cancel  context.CancelFunc
@@ -117,7 +118,7 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 	ui.SplitVerticalPercent(c, &a.split, func() {
 		ui.Column(c).Fill().Children(func() {
 			ui.Tabs(c, &tb.reqTab, counted("Params", r.Query), counted("Path", r.Path),
-				counted("Headers", r.Headers), bodyLabel(&r.Body), "Auth").Padding(0, 12)
+				counted("Headers", r.Headers), bodyLabel(&r.Body), authLabel(&r.Auth)).Padding(0, 12)
 			ui.Scroll(c).Grow(1).Children(func() { a.requestPane(c, tb, r) })
 		})
 	}, func() {
@@ -249,7 +250,7 @@ func (a *app) requestPane(c *ui.Context, tb *tab, r *model.Request) {
 	case 3:
 		a.bodyPane(c, tb, r)
 	case 4:
-		emptyState(c, "No auth", "")
+		a.authPane(c, tb, r)
 	}
 }
 
@@ -307,5 +308,82 @@ func setBodyLanguage(st *editor.State, kind string) {
 		st.Buffer.SetLanguage(editor.LanguageNamed("JSON"))
 	} else {
 		st.Buffer.SetLanguage(nil)
+	}
+}
+
+var authKinds = []string{model.AuthNone, model.AuthBasic, model.AuthBearer, model.AuthAPIKey}
+
+func authLabel(au *model.Auth) string {
+	if au.Kind == model.AuthNone {
+		return "Auth"
+	}
+	return "Auth •"
+}
+
+func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
+	t := c.Theme()
+	au := &r.Auth
+	kind := slices.Index(authKinds, au.Kind)
+	changed := false
+	ui.Row(c).Padding(8, 12).Children(func() {
+		if ui.Segmented(c, &kind, "None", "Basic", "Bearer", "API Key").Label("Auth type").Changed() {
+			au.Kind, changed = authKinds[kind], true
+		}
+	})
+	if au.Kind == model.AuthNone {
+		ui.Text(c, "This request sends no credentials.").FontSize(12).TextColor(t.TextMuted).Padding(4, 12)
+		return
+	}
+	// A Field's label focuses its input when clicked.
+	field := func(label string, value *string, secret bool) ui.Element {
+		return ui.Field(c, label, func() {
+			ui.Row(c).Gap(8).AlignItems(ui.Center).MaxWidth(560).Children(func() {
+				in := ui.TextInput(c, value).Grow(1).MinWidth(0).Font(mono).FontSize(12)
+				if secret && !tb.reveal {
+					in.Password()
+				}
+				changed = in.Changed() || changed
+				if !secret {
+					return
+				}
+				show := "Show"
+				if tb.reveal {
+					show = "Hide"
+				}
+				if ui.Button(c, show).FontSize(12).MinWidth(64).Shrink(0).Clicked() {
+					tb.reveal = !tb.reveal
+				}
+			})
+		})
+	}
+	ui.Form(c, func() {
+		switch au.Kind {
+		case model.AuthBasic:
+			field("Username", &au.Username, false)
+			field("Password", &au.Password, true)
+		case model.AuthBearer:
+			field("Token", &au.Token, true).Description("Sent as Authorization: Bearer <token>.")
+		case model.AuthAPIKey:
+			field("Key", &au.Key, false)
+			field("Value", &au.Value, true)
+			in := 0
+			if au.InQuery {
+				in = 1
+			}
+			ui.Field(c, "Add to", func() {
+				// In a row, the control keeps its own width rather than the
+				// field's.
+				ui.Row(c).Children(func() {
+					if ui.Segmented(c, &in, "Header", "Query").Changed() {
+						au.InQuery, changed = in == 1, true
+					}
+				})
+			})
+		}
+	}).Padding(4, 12)
+	ui.Text(c, "A header or query parameter of the same name set by hand wins.").
+		FontSize(12).TextColor(t.TextMuted).Padding(8, 12)
+	if changed {
+		a.changed()
 	}
 }

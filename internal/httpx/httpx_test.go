@@ -125,3 +125,47 @@ func TestBodies(t *testing.T) {
 		t.Errorf("missing file: %v", err)
 	}
 }
+
+func TestAuth(t *testing.T) {
+	build := func(r *model.Request) *http.Request {
+		t.Helper()
+		r.Method = "GET"
+		req, err := Build(context.Background(), r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return req
+	}
+
+	req := build(&model.Request{URL: "a.dev", Auth: model.Auth{Kind: model.AuthBasic, Username: "ada", Password: "pw"}})
+	if u, p, ok := req.BasicAuth(); !ok || u != "ada" || p != "pw" {
+		t.Errorf("basic: %q", req.Header.Get("Authorization"))
+	}
+
+	req = build(&model.Request{URL: "a.dev", Auth: model.Auth{Kind: model.AuthBearer, Token: "tok"}})
+	if got := req.Header.Get("Authorization"); got != "Bearer tok" {
+		t.Errorf("bearer: %q", got)
+	}
+
+	req = build(&model.Request{URL: "a.dev", Auth: model.Auth{Kind: model.AuthBearer, Token: "tok"},
+		Headers: []model.KV{{Key: "Authorization", Value: "Custom x", Enabled: true}}})
+	if got := req.Header.Get("Authorization"); got != "Custom x" {
+		t.Errorf("a hand-set Authorization was replaced by %q", got)
+	}
+
+	req = build(&model.Request{URL: "a.dev", Auth: model.Auth{Kind: model.AuthAPIKey, Key: "X-API-Key", Value: "k"}})
+	if got := req.Header.Get("X-API-Key"); got != "k" {
+		t.Errorf("api key header: %q", got)
+	}
+
+	req = build(&model.Request{URL: "a.dev/x?b=2&a=1", Auth: model.Auth{Kind: model.AuthAPIKey, Key: "api key", Value: "k&v", InQuery: true}})
+	if got := req.URL.RawQuery; got != "b=2&a=1&api+key=k%26v" {
+		t.Errorf("api key query: %q", got)
+	}
+
+	// Kinds keep what was typed for others, but send only their own.
+	req = build(&model.Request{URL: "a.dev", Auth: model.Auth{Kind: model.AuthNone, Token: "tok"}})
+	if got := req.Header.Get("Authorization"); got != "" {
+		t.Errorf("none sent %q", got)
+	}
+}

@@ -52,6 +52,13 @@ go vet ./... && go test ./...
 - `mygo.Dialog.Open` chờ người dùng chọn xong mới trả về, nên phải gọi trong goroutine rồi trả kết quả qua `win.Update` (`a.pickFile`). Callback ghi đường dẫn vào dòng theo vị trí và chỉ ghi nếu key ở đó chưa đổi, vì trong lúc dialog mở các dòng có thể đã bị thêm hoặc xoá.
 - Body JSON/Text: buffer của editor (`tab.bodyEdit`) là nguồn chính; mỗi frame so `Buffer.String()` với `Body.Text` rồi chép sang. Chỉ gọi `SetLanguage` khi đổi kiểu body.
 
+### Auth
+- `model.Auth` giữ field của mọi kiểu auth, đổi kiểu qua lại không mất chữ đã gõ; lúc gửi (`httpx.applyAuth`) chỉ dùng field của kiểu đang chọn. Header/query cùng tên mà người dùng tự đặt thì thắng.
+- API key trong query được nối vào `RawQuery`; đừng dùng `URL.Query().Encode()` vì nó sắp xếp lại thứ tự query.
+- Form có label thì dùng `ui.Form` + `ui.Field` (bấm vào label sẽ focus control). Control nào phải giữ đúng chiều rộng của nó (như Segmented) thì bọc trong `ui.Row`, không thì bị kéo dài theo field.
+- `TextInput.Password()` chỉ che chữ trong những frame có gọi nó; muốn hiện thì frame đó không gọi nữa.
+- Credential được lưu dạng plain text trong `workspace.json`.
+
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.
 - Trạng thái mở/đóng folder nằm ở `a.files.Open`, chỉ chép sang `Folder.Open` lúc `flush` (lần ghi kế tiếp hoặc khi thoát app qua `OnBeforeQuit`).
@@ -62,5 +69,7 @@ go vet ./... && go test ./...
 - Sau `ChooseMenuItem`, `Key`, `Click` thì gọi `tt.Frame()` trước khi assert. Thời gian (debounce, animation) dùng `tt.Advance`, không sleep.
 - Đổi state từ ngoài view (chạy hàm `update` trong test) thì phải `tt.Frame()`: `Advance` chỉ chạy các frame mà view tự xin, nên không có Frame thì `tt.Image()`/`HasText` vẫn là frame cũ.
 - Test gửi request: `sendingApp` thay `a.update` bằng channel, test nhận hàm rồi tự chạy, sau đó `tt.Frame()`. Server dùng `httptest`. Chạy thêm `CGO_ENABLED=1 go test -race ./...` khi đụng tới goroutine.
+- `tt.Texts()`/`HasText` chỉ thấy text và label, không thấy nội dung ô nhập: kiểm tra giá trị trên model, còn chữ có bị che hay không thì xem bằng ảnh chụp.
+- Hai element trùng tên (chữ hiển thị và label của ô nhập) thì `tt.Click` bấm vào cái đầu tiên. Dùng `ui.Field`, hoặc đặt label cho ô nhập khác đi.
 - Test cho tương tác chuột phải mô phỏng đúng thứ người dùng làm (bấm nhanh liên tiếp, bấm vào vùng thụt lề, `ClickAt`), không chỉ `Click` vào giữa label.
 - Kiểm tra giao diện bằng mắt: viết `shot_test.go` tạm, encode `tt.Image()` ra PNG trong `/tmp` (`SetDark`, `SetTitleBar` để giống app thật), xem xong thì xoá cả file test lẫn ảnh.

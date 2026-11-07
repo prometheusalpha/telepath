@@ -197,6 +197,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Khôi phục tab đang mở + tab active + kích thước split khi mở lại app.
 - Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌘L focus URL.
 - Response: nút copy body, lưu body ra file, cảnh báo/ cắt hiển thị khi response quá lớn.
+- Lưu password/token/API key (Auth) và biến secret vào Keychain qua module `secrets` của MyGo, thay vì plain text trong `workspace.json`.
 - Đóng gói bằng `mygo` CLI, icon app.
 
 ---
