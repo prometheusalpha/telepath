@@ -14,7 +14,7 @@ go vet ./... && go test ./...
 - Docs MyGo đúng version đang pin: `$(go list -m -f '{{.Dir}}' github.com/egoist/mygo)/docs/ui/*.md`; API thật thì grep `ui/api_gen.go`. Kiểm tra API trong source trước khi dùng, đừng đoán.
 - Skill bảo trì MyGo: `.agents/skills/mygo-maintenance/SKILL.md`.
 - Icon: nguồn là `design/icon.svg`, file app dùng là `resources/icon.png` (1024×1024). Đừng để file nguồn trong `resources/`, vì cả thư mục đó bị đóng gói vào app. Sửa SVG xong thì render lại PNG bằng một test tạm: `ui.Image(c, ui.MustParseSVG(svg)).Size(1024, 1024)` trong `ui.NewTester(view, 1024, 1024)`, nền root để `ui.Transparent`, rồi `png.Encode(tt.Image())`. Xong thì xoá test đó.
-- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` hiện vẫn là giá trị mẫu `com.example.telepath`.
+- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` là `io.starchaser.telepath`; đừng đổi nữa, vì bản build dùng nó làm tên service Keychain giữ khoá mã hoá secret, đổi là không đọc lại được secret đã lưu.
 - `mygo dev` chạy app tên `<name> Dev` với identifier riêng, nên dữ liệu (`workspace.json` trong `PathUserData`) có thể khác với khi chạy `go run .`.
 
 ## Cấu trúc
