@@ -28,6 +28,12 @@ type app struct {
 	envOpen  bool
 	envDraft model.KV
 
+	searchOpen bool
+	query      string
+	hits       []hit // what the search shows, for its keys between frames
+	searchSel  int
+	recent     []string // requests opened, the last first
+
 	files    ui.OutlineState[string]
 	depth    int  // of the row being built, from the outline's Prefix
 	open     bool // likewise
@@ -140,6 +146,7 @@ func (a *app) view(c *ui.Context) {
 	ui.Split(c, &a.sidebarWidth, func() { a.sidebar(c) }, func() { a.content(c) }).
 		SplitReset(240).Fill()
 	a.envModal(c)
+	a.searchModal(c)
 	a.autosave(c)
 }
 
@@ -208,6 +215,9 @@ func main() {
 				}},
 				{Label: "Close Window", Accelerator: "CmdOrCtrl+Shift+W", Role: mygo.RoleClose},
 				mygo.Separator(),
+				{Label: "Search…", Accelerator: "CmdOrCtrl+K", Click: func(*mygo.MenuItem, *mygo.Window) {
+					win.Update(a.openSearch)
+				}},
 				{Label: "Variables…", Accelerator: "CmdOrCtrl+E", Click: func(*mygo.MenuItem, *mygo.Window) {
 					win.Update(func() { a.envOpen = true })
 				}},

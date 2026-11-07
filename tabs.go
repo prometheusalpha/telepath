@@ -13,6 +13,8 @@ func (a *app) openTab(id string) {
 	if n := a.tree.byID[id]; n == nil || n.Request == nil {
 		return
 	}
+	a.recent = slices.Insert(slices.DeleteFunc(a.recent, func(r string) bool { return r == id }), 0, id)
+	a.recent = a.recent[:min(len(a.recent), 10)]
 	if i := slices.IndexFunc(a.tabs, func(t *tab) bool { return t.id == id }); i >= 0 {
 		a.active = i
 		return

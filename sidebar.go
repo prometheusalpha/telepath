@@ -16,18 +16,22 @@ var folderIcon = icon(`<path d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.4 1.5h6a1 1 0 0 1 1
 // tree is what the outline reads; rebuilt after every edit of the
 // workspace rather than walked each frame.
 type tree struct {
-	byID  map[string]*model.Node
-	roots []string
-	kids  map[string][]string // nil for requests, empty for empty folders
+	byID   map[string]*model.Node
+	roots  []string
+	kids   map[string][]string // nil for requests, empty for empty folders
+	parent map[string]string   // "" at the top
 }
 
 func (a *app) reindex() {
-	t := tree{byID: map[string]*model.Node{}, kids: map[string][]string{}}
+	t := tree{byID: map[string]*model.Node{}, kids: map[string][]string{}, parent: map[string]string{}}
 	for _, n := range a.ws.Items {
 		t.roots = append(t.roots, n.ID)
 	}
-	a.ws.Walk(func(n, _ *model.Node) bool {
+	a.ws.Walk(func(n, p *model.Node) bool {
 		t.byID[n.ID] = n
+		if p != nil {
+			t.parent[n.ID] = p.ID
+		}
 		if n.Folder != nil {
 			ids := make([]string, 0, len(n.Folder.Children))
 			for _, k := range n.Folder.Children {
@@ -47,7 +51,9 @@ func (a *app) sidebar(c *ui.Context) {
 		ui.Row(c).Height(max(bar.Height, titleBarHeight)).Shrink(0).AlignItems(ui.Center).
 			Padding(0, 10, 0, bar.Left+10).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
-			iconButton(c, searchIcon, "Search")
+			if iconButton(c, searchIcon, "Search").Tooltip("Search ⌘K").Clicked() {
+				a.openSearch()
+			}
 			iconButton(c, plusIcon, "New").Menu(func(m *ui.Menu) {
 				if m.Item("New Request").Chosen() {
 					a.create(model.NewRequest("New Request"), a.selected)
