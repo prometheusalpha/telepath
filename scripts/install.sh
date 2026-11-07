@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # Builds the app, signed, and puts it in /Applications, replacing the copy
 # there. SIGN_IDENTITY picks the certificate (security find-identity -v -p
-# codesigning lists them); without one the build is signed ad hoc.
+# codesigning lists them). By default it is the self-signed "Telepath Local
+# Signing" where the keychain has it, else ad hoc: a certificate keeps the
+# app's signature the same from build to build, so the Keychain doesn't ask
+# again for the secrets' key after each one.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 app=build/darwin-arm64/telepath.app
 dest=/Applications/telepath.app
+local_identity="Telepath Local Signing"
+if [[ -z ${SIGN_IDENTITY:-} ]] && security find-identity -v -p codesigning | grep -q "\"$local_identity\""; then
+	SIGN_IDENTITY=$local_identity
+fi
 identity=${SIGN_IDENTITY:--}
 
 if pgrep -qf "$dest/"; then

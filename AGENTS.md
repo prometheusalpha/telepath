@@ -8,7 +8,7 @@ API client desktop nhỏ (sidebar cây folder/request, tab, editor request, mộ
 go run .                 # chạy app
 go tool mygo dev         # chạy app với live reload (build lại khi sửa Go)
 go tool mygo build       # build production vào build/darwin-arm64/telepath.app (ký ad-hoc; thêm -skip-dmg cho nhanh)
-scripts/install.sh       # build, ký, kiểm tra chữ ký rồi thay bản trong /Applications (SIGN_IDENTITY=… để ký bằng chứng chỉ, mặc định ad-hoc; app đang chạy thì dừng, bảo quit trước)
+scripts/install.sh       # build, ký, kiểm tra chữ ký rồi thay bản trong /Applications (mặc định ký bằng chứng chỉ tự ký `Telepath Local Signing` nếu Keychain có, không thì ad-hoc; SIGN_IDENTITY=… để chọn chứng chỉ khác; app đang chạy thì dừng, bảo quit trước)
 go vet ./... && go test ./...
 ```
 
@@ -108,7 +108,7 @@ go vet ./... && go test ./...
 - Secret trong file: `store.Sealer` mã hoá bằng AES-GCM (`enc:v1:…`), khoá 32 byte nằm trong Keychain (`mygo.Secrets`, tên `workspace-key`). Không lưu từng secret vào Keychain, vì mỗi mục tối đa 2560 byte. Các field được mã hoá liệt kê trong hàm `secrets()`; thêm field nhạy cảm mới thì thêm vào đó.
 - Không lấy được khoá thì sealer là `nil`: giá trị đã mã hoá được giữ nguyên và `Load` đếm vào `locked` (app báo bằng toast), giá trị mới thì lưu chữ thường. Đừng xoá hay ghi đè các chuỗi `enc:v1:` mà mình không giải mã được.
 - Header (như `Authorization` tự gõ tay) và file export không được mã hoá; export cố ý xuất chữ thường để mang sang máy khác dùng được.
-- Mặc định `mygo.Secrets` dùng service khác nhau cho `go run .` (tên app), `mygo dev` (`<identifier>.dev`) và bản build (identifier), nên trước đây mỗi bản có khoá riêng và file bị trộn secret của nhiều khoá. Giờ mọi bản dùng chung `keyService`. Khoá ở các service cũ (`oldKeyServices`) chỉ được đọc khi có secret mà khoá chung không mở được: đọc item Keychain của app khác có thể bị macOS hỏi quyền, nên không đọc lúc nào cũng được. Secret nào mở bằng khoá cũ thì `Sealer.Stale()` báo, app `touch()` để lần ghi kế tiếp mã hoá lại bằng khoá chung. Bản ký ad-hoc đổi chữ ký mỗi lần build, nên macOS có thể hỏi lại quyền đọc Keychain (chọn Always Allow).
+- Mặc định `mygo.Secrets` dùng service khác nhau cho `go run .` (tên app), `mygo dev` (`<identifier>.dev`) và bản build (identifier), nên trước đây mỗi bản có khoá riêng và file bị trộn secret của nhiều khoá. Giờ mọi bản dùng chung `keyService`. Khoá ở các service cũ (`oldKeyServices`) chỉ được đọc khi có secret mà khoá chung không mở được: đọc item Keychain của app khác có thể bị macOS hỏi quyền, nên không đọc lúc nào cũng được. Secret nào mở bằng khoá cũ thì `Sealer.Stale()` báo, app `touch()` để lần ghi kế tiếp mã hoá lại bằng khoá chung. Bản ký ad-hoc đổi chữ ký mỗi lần build, nên macOS có thể hỏi lại quyền đọc Keychain (chọn Always Allow); bản ký bằng chứng chỉ thì giữ nguyên chữ ký qua các lần build.
 - `store.Load` lỗi thì app `log.Fatal` là cố ý: mở app với workspace trống thì lần sửa đầu tiên sẽ ghi đè mất file cũ.
 
 ### Test
