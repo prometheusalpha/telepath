@@ -15,7 +15,7 @@ go vet ./... && go test ./...
 - Docs MyGo đúng version đang pin: `$(go list -m -f '{{.Dir}}' github.com/egoist/mygo)/docs/ui/*.md`; API thật thì grep `ui/api_gen.go`. Kiểm tra API trong source trước khi dùng, đừng đoán.
 - Skill bảo trì MyGo: `.agents/skills/mygo-maintenance/SKILL.md`.
 - Icon: nguồn là `design/icon.svg` (hình ở giữa là `design/logo.svg`, scale từ khung 1021 về 560), file app dùng là `resources/icon.png` (1024×1024). Đừng để file nguồn trong `resources/`, vì cả thư mục đó bị đóng gói vào app. Sửa SVG xong thì render lại PNG bằng một test tạm: `ui.Image(c, ui.MustParseSVG(svg)).Size(1024, 1024)` trong `ui.NewTester(view, 1024, 1024)`, nền root để `ui.Transparent`, rồi `png.Encode(tt.Image())`. Xong thì xoá test đó.
-- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` là `io.starchaser.telepath`. Service Keychain giữ khoá mã hoá secret được cố định là `keyService` (cũng là `io.starchaser.telepath`) trong `main.go`, không phụ thuộc vào identifier; đừng đổi hằng đó, đổi là không đọc lại được secret đã lưu.
+- Không đổi `name` trong `mygo.json`: nó quyết định thư mục dữ liệu (`~/Library/Application Support/telepath`). `identifier` là `io.starchaser.telepath`. Service Keychain giữ khoá mã hoá secret được cố định là `keyService` (cũng là `io.starchaser.telepath`) trong `internal/app/app.go`, không phụ thuộc vào identifier; đừng đổi hằng đó, đổi là không đọc lại được secret đã lưu.
 - `mygo dev` chạy app tên `<name> Dev` với identifier riêng, nên dữ liệu (`workspace.json` trong `PathUserData`) có thể khác với khi chạy `go run .`.
 
 ## Cấu trúc
@@ -26,12 +26,13 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- Root `package main`: view (`main.go`, `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng tạo package view tên `ui`, sẽ trùng với `mygo/ui`.
+- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog, Keychain; còn lại `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
+- Root chỉ có `main.go` gọi `app.Run()`; code mới không để ở root.
 
 ## Gotchas
 
 ### Theme
-- Font mono nhúng sẵn (`fonts/`, đăng ký trong `fonts.go` với tên `Telepath Mono`); mọi chỗ `Font(mono)` đều kèm `FontFeatures(monoFeatures)` (feature lấy theo `~/.config/ghostty/config`, chỉ bật khi dùng font có sẵn của app, vì `ssXX` ở font khác là những glyph khác). `mono`, `monoFeatures` và `codeSize` là biến cấp package, `setMono(ws)` gán lại (trong `newApp` và khi đổi Settings); test nào đổi chúng thì phải trả lại mặc định.
+- Font mono nhúng sẵn (`internal/app/fonts/`, đăng ký trong `fonts.go` với tên `Telepath Mono`); mọi chỗ `Font(mono)` đều kèm `FontFeatures(monoFeatures)` (feature lấy theo `~/.config/ghostty/config`, chỉ bật khi dùng font có sẵn của app, vì `ssXX` ở font khác là những glyph khác). `mono`, `monoFeatures` và `codeSize` là biến cấp package, `setMono(ws)` gán lại (trong `newApp` và khi đổi Settings); test nào đổi chúng thì phải trả lại mặc định.
 - Editor (body request/response) gọi `styleCode` mỗi frame: theme code (`lightCode`/`darkCode`, màu token JSON riêng) và font theo Settings.
 - `c.Theme()` mỗi frame bắt đầu lại từ theme light/dark của hệ thống. `applyTheme` chọn một trong hai theme dựng sẵn (`lightTheme`/`darkTheme`) theo `Dark`; đừng copy theme mới mỗi frame.
 - Đổi System/Light/Dark bằng `mygo.Theme.SetSource` (qua `a.setAppearance`) để vibrancy, menu, title bar và `c.Theme()` cùng đổi; không tự ép `darkTheme` trong view. Lựa chọn lưu ở `Workspace.Theme` và được áp dụng trước khi tạo cửa sổ. Dấu tích ở View > Appearance được set tay trong `setAppearance`, vì nút ở sidebar cũng đổi được.
@@ -122,4 +123,4 @@ go vet ./... && go test ./...
 - `tt.Texts()`/`HasText` chỉ thấy text và label, không thấy nội dung ô nhập: kiểm tra giá trị trên model, còn chữ có bị che hay không thì xem bằng ảnh chụp.
 - Hai element trùng tên (chữ hiển thị và label của ô nhập) thì `tt.Click` bấm vào cái đầu tiên. Dùng `ui.Field`, hoặc đặt label cho ô nhập khác đi.
 - Test cho tương tác chuột phải mô phỏng đúng thứ người dùng làm (bấm nhanh liên tiếp, bấm vào vùng thụt lề, `ClickAt`), không chỉ `Click` vào giữa label.
-- Kiểm tra giao diện bằng mắt: viết `shot_test.go` tạm, encode `tt.Image()` ra PNG trong `/tmp` (`SetDark`, `SetTitleBar` để giống app thật), xem xong thì xoá cả file test lẫn ảnh.
+- Kiểm tra giao diện bằng mắt: viết `shot_test.go` tạm trong `internal/app`, encode `tt.Image()` ra PNG trong `/tmp` (`SetDark`, `SetTitleBar` để giống app thật), xem xong thì xoá cả file test lẫn ảnh.

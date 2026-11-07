@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"os"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestImportPostmanKeepsVariables(t *testing.T) {
-	data, err := os.ReadFile("internal/importx/testdata/acme.postman_collection.json")
+	data, err := os.ReadFile("../importx/testdata/acme.postman_collection.json")
 	if err != nil {
 		t.Fatal(err)
 	}
