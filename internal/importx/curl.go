@@ -2,6 +2,7 @@ package importx
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -181,6 +182,7 @@ func ParseCurl(cmd string) (*model.Request, error) {
 	if r.URL == "" {
 		return nil, errors.New("the command has no URL")
 	}
+	authFromHeader(r)
 	joined := strings.Join(data, "&")
 	switch {
 	case get && joined != "":
@@ -205,6 +207,34 @@ func ParseCurl(cmd string) (*model.Request, error) {
 	r.QueryFromURL()
 	r.PathFromURL()
 	return r, nil
+}
+
+// authFromHeader moves a Basic or Bearer Authorization header into Auth.
+// The header wins over -u, as it does in curl. Other schemes, or Basic
+// that doesn't decode to user:password, stay as headers.
+func authFromHeader(r *model.Request) {
+	i := slices.IndexFunc(r.Headers, func(h model.KV) bool { return strings.EqualFold(h.Key, "Authorization") })
+	if i < 0 {
+		return
+	}
+	scheme, cred, _ := strings.Cut(r.Headers[i].Value, " ")
+	cred = strings.TrimSpace(cred)
+	switch {
+	case cred == "":
+		return
+	case strings.EqualFold(scheme, "Bearer"):
+		r.Auth = model.Auth{Kind: model.AuthBearer, Token: cred}
+	case strings.EqualFold(scheme, "Basic"):
+		b, err := base64.StdEncoding.DecodeString(cred)
+		u, p, ok := strings.Cut(string(b), ":")
+		if err != nil || !ok {
+			return
+		}
+		r.Auth = model.Auth{Kind: model.AuthBasic, Username: u, Password: p}
+	default:
+		return
+	}
+	r.Headers = slices.Delete(r.Headers, i, i+1)
 }
 
 func header(hs []model.KV, key string) string {

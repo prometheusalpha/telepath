@@ -32,8 +32,8 @@ func TestParseCurlFromChrome(t *testing.T) {
 	if r.Method != "POST" || r.URL != "https://api.acme.dev/users/:id?expand=roles" || len(r.Query) != 1 || len(r.Path) != 1 {
 		t.Errorf("method %q, url %q, query %+v, path %+v", r.Method, r.URL, r.Query, r.Path)
 	}
-	if len(r.Headers) != 2 || r.Headers[1].Value != "Bearer abc" {
-		t.Errorf("headers %+v", r.Headers)
+	if len(r.Headers) != 1 || r.Auth.Kind != model.AuthBearer || r.Auth.Token != "abc" {
+		t.Errorf("headers %+v, auth %+v", r.Headers, r.Auth)
 	}
 	if r.Body.Kind != model.BodyJSON || r.Body.Text != `{"name":"Ada's"}` {
 		t.Errorf("body %+v", r.Body)
@@ -63,6 +63,20 @@ func TestParseCurlBodies(t *testing.T) {
 	}
 }
 
+func TestParseCurlAuthHeader(t *testing.T) {
+	// YWRhOnA6dw== is ada:p:w; the header wins over -u.
+	r, _ := ParseCurl(`curl a.dev -u x:y -H 'Authorization: basic YWRhOnA6dw=='`)
+	if len(r.Headers) != 0 || r.Auth != (model.Auth{Kind: model.AuthBasic, Username: "ada", Password: "p:w"}) {
+		t.Errorf("basic: %+v, %+v", r.Headers, r.Auth)
+	}
+	for _, v := range []string{"Basic not-base64", "Digest x=1", "Bearer "} {
+		r, _ = ParseCurl(`curl a.dev -H 'Authorization: ` + v + `'`)
+		if len(r.Headers) != 1 || r.Auth.Kind != "" {
+			t.Errorf("%q: %+v, %+v", v, r.Headers, r.Auth)
+		}
+	}
+}
+
 func TestCurlRoundTrip(t *testing.T) {
 	in := &model.Request{Method: "POST", URL: "https://a.dev/users/:id?x=a b",
 		Path:    []model.KV{{Key: "id", Value: "7", Enabled: true}},
@@ -79,7 +93,7 @@ func TestCurlRoundTrip(t *testing.T) {
 		}
 	}
 	out, err := ParseCurl(cmd)
-	if err != nil || out.Method != "POST" || out.Body.Text != `{"a":1}` || header(out.Headers, "X-Note") != "it's" {
+	if err != nil || out.Method != "POST" || out.Body.Text != `{"a":1}` || header(out.Headers, "X-Note") != "it's" || out.Auth != in.Auth {
 		t.Errorf("parsed back %+v, %v", out, err)
 	}
 

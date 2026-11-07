@@ -102,7 +102,7 @@ go vet ./... && go test ./...
 - Postman: auth của collection/folder được copy vào các request không có auth riêng (app không có kế thừa auth). Script và các kiểu auth app không hỗ trợ thì bị bỏ qua, có báo trong `Result.Skipped`.
 - Export folder chỉ kèm những biến mà request trong folder có dùng; export workspace kèm toàn bộ biến.
 - Copy as cURL thay biến trước, rồi `httpx.Build` sinh header (auth, Content-Type). Multipart thì dùng `-F` và không dựng body, để khỏi phải đọc file.
-- `ParseCurl` tách lệnh theo kiểu shell (`splitShell`, có hỗ trợ `$'…'` của Chrome). Flag không ảnh hưởng tới request thì bỏ qua; flag có kèm giá trị phải nằm trong `ignoredWithValue`, không thì giá trị đó bị coi là URL.
+- `ParseCurl` tách lệnh theo kiểu shell (`splitShell`, có hỗ trợ `$'…'` của Chrome). Flag không ảnh hưởng tới request thì bỏ qua; flag có kèm giá trị phải nằm trong `ignoredWithValue`, không thì giá trị đó bị coi là URL. Header `Authorization` kiểu Bearer, hoặc Basic giải mã được ra `user:pass`, được chuyển vào Auth và bỏ khỏi Headers (`authFromHeader`); header này thắng `-u`, giống curl.
 - Dialog chạy trong goroutine (`a.openFile`, `a.saveFile`); kết quả về qua `win.Update`, thông báo đặt vào `a.toast` để frame sau hiện ra. `newApp` gán sẵn bản không làm gì cho các hook dialog, test thì thay bằng bản giả.
 
 ### Lưu dữ liệu
