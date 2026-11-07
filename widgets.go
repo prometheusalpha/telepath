@@ -1,0 +1,53 @@
+package main
+
+import "github.com/egoist/mygo/ui"
+
+func icon(shapes string) *ui.SVG {
+	return ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">` + shapes + `</svg>`))
+}
+
+var (
+	plusIcon   = icon(`<path d="M8 3v10M3 8h10"/>`)
+	searchIcon = icon(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/>`)
+	sendIcon   = icon(`<path d="M2.5 8h10M9 4.5L12.5 8 9 11.5"/>`)
+)
+
+// methodBadge shortens the long methods so badges keep one width in the
+// sidebar and the tabs.
+func methodBadge(c *ui.Context, method string) ui.Element {
+	label := method
+	switch method {
+	case "DELETE":
+		label = "DEL"
+	case "OPTIONS":
+		label = "OPT"
+	case "PATCH":
+		label = "PAT"
+	}
+	t := c.Theme()
+	return ui.Text(c, label).Font(mono).FontSize(10).FontWeight(700).
+		TextColor(methodColor(t, method)).Width(28).SingleLine()
+}
+
+// iconButton is a quiet square button; label names it for the tooltip and
+// for assistive technology, since it shows no text.
+func iconButton(c *ui.Context, svg *ui.SVG, label string) ui.Element {
+	t := c.Theme()
+	b := ui.ButtonBase(c).Size(26, 26).Radius(6).Center().
+		TextColor(t.TextMuted).Label(label).Tooltip(label)
+	if b.Hovered() {
+		b.Background(t.SurfaceHover).TextColor(t.Text)
+	}
+	b.Children(func() { ui.Icon(c, svg).Size(15, 15) })
+	return b
+}
+
+func emptyState(c *ui.Context, title, hint string) {
+	t := c.Theme()
+	ui.Column(c).Grow(1).Center().Gap(6).Padding(24).Children(func() {
+		ui.Text(c, title).FontSize(15).FontWeight(600).TextColor(t.TextMuted)
+		if hint != "" {
+			ui.Text(c, hint).FontSize(12).TextColor(t.TextMuted).Opacity(0.8)
+		}
+	})
+}

@@ -1,0 +1,6 @@
+{
+  "name": "telepath",
+  "identifier": "com.example.telepath",
+  "version": "0.1.0",
+  "out": "build"
+}
