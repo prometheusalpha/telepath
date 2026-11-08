@@ -230,7 +230,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
   - 11.3.2. Chạy filter trong goroutine, có debounce, kết quả về qua `a.update` và so `seq`. Cây đã parse giữ trong tab, dùng lại; kết quả hiện ở editor riêng, không đè `tb.body`. Biểu thức singular thì hiện giá trị trần, còn lại là mảng. Gửi lại request thì filter vẫn giữ và áp lên response mới. Body > 2 MB vẫn filter được.
   - 11.3.3. Ô filter mono dưới thanh Body (chỉ khi response là JSON), số match bên phải, lỗi hiện một dòng đỏ và giữ kết quả đúng gần nhất, không match thì "No match", Esc hoặc nút × trong ô để xoá. Biểu thức chỉ nằm trong tab, không lưu. Copy body chép kết quả đang thấy; Save body vẫn ghi body gốc. Không có phím tắt riêng.
   - 11.3.4. Test bằng `ui.NewTester` (gõ filter, lỗi, Esc, gửi lại), `-race`; cập nhật Gotchas trong `CLAUDE.md`.
-- 11.4 README.md
+- 11.4 README.md (xong)
 
 ---
 
