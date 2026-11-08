@@ -188,6 +188,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - **Native JSON:** export cả workspace hoặc một folder (`Dialog.Save`), import lại (`Dialog.Open`) → merge vào gốc dưới folder mới, không đè dữ liệu cũ.
 - **Postman Collection v2.1 import:** folder, request, query, header, body (raw/urlencoded/formdata), auth basic/bearer/apikey; biến collection gộp vào bộ biến duy nhất (trùng key thì giữ giá trị cũ và báo trong toast, không hỏi). Auth của collection/folder được copy vào request. Script/test bị bỏ qua và báo số lượng đã bỏ.
+- **Postman Collection v2.1 export:** export cả workspace hoặc một folder ra `<tên>.postman_collection.json` (lệnh riêng, cạnh export native); biến ghi vào `variable` của collection, cùng quy tắc chọn biến như export native.
 - **cURL:** dán lệnh cURL → tạo request; context menu "Copy as cURL" (đã thay biến).
 - Báo kết quả bằng toast: "Imported 12 requests, skipped 3 scripts".
 

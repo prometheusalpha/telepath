@@ -64,6 +64,17 @@ func TestExportFolderTakesItsVariables(t *testing.T) {
 	if !tt.HasText("Exported Users") {
 		t.Errorf("texts %q", tt.Texts())
 	}
+
+	tt.RightClick("Users")
+	if err := tt.ChooseMenuItem("Export as Postman…"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	res, err = importx.Parse(saved, savedAs)
+	if err != nil || savedAs != "Users.postman_collection.json" || !strings.Contains(string(saved), `"schema"`) ||
+		len(res.Items) != 1 || len(res.Env) != 1 || res.Env[0].Key != "base" {
+		t.Errorf("saved %s: %+v, %v", savedAs, res, err)
+	}
 }
 
 func TestCurlInAndOut(t *testing.T) {

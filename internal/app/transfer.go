@@ -72,13 +72,13 @@ func count(n int, what string) string {
 	return fmt.Sprintf("%d %ss", n, what)
 }
 
-func (a *app) exportWorkspace() {
-	a.export("Telepath", a.ws.Items, a.ws.Env)
+func (a *app) exportWorkspace(postman bool) {
+	a.export("Telepath", a.ws.Items, a.ws.Env, postman)
 }
 
 // exportFolder writes a folder with the variables its requests use, so
 // the file works on its own without carrying every secret along.
-func (a *app) exportFolder(n *model.Node) {
+func (a *app) exportFolder(n *model.Node, postman bool) {
 	b, _ := json.Marshal(n)
 	used := map[string]bool{}
 	for _, r := range vars.Refs(string(b)) {
@@ -90,18 +90,24 @@ func (a *app) exportFolder(n *model.Node) {
 			env = append(env, kv)
 		}
 	}
-	a.export(n.Name, []*model.Node{n}, env)
+	a.export(n.Name, []*model.Node{n}, env, postman)
 }
 
-func (a *app) export(name string, items []*model.Node, env []model.KV) {
+// export writes Telepath's own format, or a Postman collection v2.1 named
+// as Postman names its files.
+func (a *app) export(name string, items []*model.Node, env []model.KV, postman bool) {
+	write, file := importx.Export, name+".json"
+	if postman {
+		write, file = importx.ExportPostman, name+".postman_collection.json"
+	}
 	// Marshaled here, on the main thread, before the dialog lets the
 	// workspace change.
-	data, err := importx.Export(name, items, env)
+	data, err := write(name, items, env)
 	if err != nil {
 		a.toast = "Couldn't export: " + err.Error()
 		return
 	}
-	a.saveFile(name+".json", data, func(err error) {
+	a.saveFile(file, data, func(err error) {
 		if err != nil {
 			a.toast = "Couldn't export: " + err.Error()
 		} else {

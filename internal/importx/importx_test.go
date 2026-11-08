@@ -1,6 +1,7 @@
 package importx
 
 import (
+	"encoding/json"
 	"os"
 	"slices"
 	"strings"
@@ -164,5 +165,60 @@ func TestNativeRoundTrip(t *testing.T) {
 	}
 	if _, err := Parse([]byte(`{"telepath": 99, "items": []}`), "x.json"); err == nil {
 		t.Error("a newer format")
+	}
+}
+
+func TestPostmanRoundTrip(t *testing.T) {
+	first, err := Parse(readPostman(t), "acme.postman_collection.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty := model.NewFolder("Empty")
+	items := append(first.Items, empty)
+	data, err := ExportPostman("Acme", items, first.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := Parse(data, "x.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// IDs are new on each import; everything else comes back.
+	strip := func(nodes []*model.Node) string {
+		w := &model.Workspace{Items: nodes}
+		w.Walk(func(n, _ *model.Node) bool { n.ID = ""; return true })
+		b, _ := json.Marshal(w)
+		return string(b)
+	}
+	if a, b := strip(items), strip(again.Items); a != b {
+		t.Errorf("round trip\n%s\n%s", a, b)
+	}
+	if !slices.Equal(again.Env, first.Env) || len(again.Skipped) != 0 {
+		t.Errorf("env %+v, skipped %q", again.Env, again.Skipped)
+	}
+
+	var c struct {
+		Info struct{ Schema string }
+		Item []map[string]json.RawMessage
+	}
+	json.Unmarshal(data, &c)
+	if c.Info.Schema != pmSchema || string(c.Item[2]["item"]) != "[]" {
+		t.Errorf("schema %q, empty folder %s", c.Info.Schema, c.Item[2]["item"])
+	}
+}
+
+func TestPostmanURLParts(t *testing.T) {
+	r := &model.Request{Method: "GET", URL: "https://api.acme.dev:8443/users/:id?a=1#top",
+		Query: []model.KV{{Key: "a", Value: "1", Enabled: true}, {Key: "b", Value: "2"}},
+		Path:  []model.KV{{Key: "id", Value: "7"}}}
+	u := pmOutURLOf(r)
+	if u.Protocol != "https" || !slices.Equal(u.Host, []string{"api", "acme", "dev"}) || u.Port != "8443" ||
+		!slices.Equal(u.Path, []string{"users", ":id"}) || u.Hash != "top" ||
+		len(u.Query) != 2 || !u.Query[1].Disabled || u.Variable[0].Value != "7" {
+		t.Errorf("parts %+v", u)
+	}
+	u = pmOutURLOf(&model.Request{URL: "{{base}}/users"})
+	if u.Protocol != "" || !slices.Equal(u.Host, []string{"{{base}}"}) || !slices.Equal(u.Path, []string{"users"}) {
+		t.Errorf("a variable host %+v", u)
 	}
 }

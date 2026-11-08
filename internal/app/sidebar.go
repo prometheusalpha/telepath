@@ -66,7 +66,10 @@ func (a *app) sidebar(c *ui.Context) {
 				}
 				m.Separator()
 				if a.menuItem(m, "export").Chosen() {
-					a.exportWorkspace()
+					a.exportWorkspace(false)
+				}
+				if a.menuItem(m, "export-postman").Chosen() {
+					a.exportWorkspace(true)
 				}
 			})
 			iconButton(c, plusIcon, "New").Menu(func(m *ui.Menu) {
@@ -218,7 +221,10 @@ func (a *app) node(c *ui.Context, n *model.Node) (later func()) {
 			later = func() { a.copyCurl(c, n) }
 		}
 		if n.Folder != nil && m.Item("Export…").Chosen() {
-			later = func() { a.exportFolder(n) }
+			later = func() { a.exportFolder(n, false) }
+		}
+		if n.Folder != nil && m.Item("Export as Postman…").Chosen() {
+			later = func() { a.exportFolder(n, true) }
 		}
 		if m.Item("Duplicate").Chosen() {
 			later = func() {

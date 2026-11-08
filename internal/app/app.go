@@ -409,6 +409,7 @@ func Run() {
 				item("import"),
 				item("import-curl"),
 				item("export"),
+				item("export-postman"),
 				mygo.Separator(),
 				item("search"),
 				item("variables"),

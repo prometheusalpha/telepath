@@ -10,7 +10,8 @@ import (
 	"telepath/internal/model"
 )
 
-// The parts of Postman's collection format v2.1 Telepath reads.
+// The parts of Postman's collection format v2.1 Telepath reads. The ones
+// shared with export leave out what's empty, as Postman's own files do.
 type pmCollection struct {
 	Info struct {
 		Name string `json:"name"`
@@ -40,9 +41,9 @@ type pmRequest struct {
 type pmKV struct {
 	Key      string `json:"key"`
 	Value    any    `json:"value"`
-	Disabled bool   `json:"disabled"`
-	Type     string `json:"type"` // "file" in form data
-	Src      any    `json:"src"`  // the file's path, or paths
+	Disabled bool   `json:"disabled,omitempty"`
+	Type     string `json:"type,omitempty"` // "file" in form data
+	Src      any    `json:"src,omitempty"`  // the file's path, or paths
 }
 
 func (kv pmKV) value() string {
@@ -75,23 +76,25 @@ func (u *pmURL) UnmarshalJSON(b []byte) error {
 }
 
 type pmBody struct {
-	Mode       string `json:"mode"`
-	Raw        string `json:"raw"`
-	URLEncoded []pmKV `json:"urlencoded"`
-	FormData   []pmKV `json:"formdata"`
-	Options    struct {
-		Raw struct {
-			Language string `json:"language"`
-		} `json:"raw"`
-	} `json:"options"`
+	Mode       string     `json:"mode"`
+	Raw        string     `json:"raw,omitempty"`
+	URLEncoded []pmKV     `json:"urlencoded,omitempty"`
+	FormData   []pmKV     `json:"formdata,omitempty"`
+	Options    *pmOptions `json:"options,omitempty"`
+}
+
+type pmOptions struct {
+	Raw struct {
+		Language string `json:"language"`
+	} `json:"raw"`
 }
 
 // pmAuth keeps each kind's settings as a list of key/value pairs.
 type pmAuth struct {
 	Type   string `json:"type"`
-	Basic  []pmKV `json:"basic"`
-	Bearer []pmKV `json:"bearer"`
-	APIKey []pmKV `json:"apikey"`
+	Basic  []pmKV `json:"basic,omitempty"`
+	Bearer []pmKV `json:"bearer,omitempty"`
+	APIKey []pmKV `json:"apikey,omitempty"`
 }
 
 func (a *pmAuth) get(list []pmKV, key string) string {
@@ -180,7 +183,7 @@ func (p *pmParser) request(pr *pmRequest, inherited *pmAuth) *model.Request {
 		case "raw":
 			r.Body.Text = b.Raw
 			r.Body.Kind = model.BodyText
-			if b.Options.Raw.Language == "json" || json.Valid([]byte(strings.TrimSpace(b.Raw))) && b.Raw != "" {
+			if b.Options != nil && b.Options.Raw.Language == "json" || json.Valid([]byte(strings.TrimSpace(b.Raw))) && b.Raw != "" {
 				r.Body.Kind = model.BodyJSON
 			}
 		case "urlencoded":
@@ -247,4 +250,145 @@ func plural(n int, what string) string {
 		return "1 " + what
 	}
 	return fmt.Sprintf("%d %ss", n, what)
+}
+
+const pmSchema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+
+// What Telepath writes. Folders, even empty ones, have an item list, as
+// that is what tells Postman an item is a folder.
+type pmOutCollection struct {
+	Info struct {
+		Name   string `json:"name"`
+		Schema string `json:"schema"`
+	} `json:"info"`
+	Item     []pmOutItem `json:"item"`
+	Variable []pmKV      `json:"variable,omitempty"`
+}
+
+type pmOutItem struct {
+	Name    string        `json:"name"`
+	Item    *[]pmOutItem  `json:"item,omitempty"`
+	Request *pmOutRequest `json:"request,omitempty"`
+}
+
+type pmOutRequest struct {
+	Method string   `json:"method"`
+	Header []pmKV   `json:"header"`
+	Body   *pmBody  `json:"body,omitempty"`
+	URL    pmOutURL `json:"url"`
+	Auth   *pmAuth  `json:"auth,omitempty"`
+}
+
+// pmOutURL has the URL's parts as well as its text: Postman builds the
+// request from the parts.
+type pmOutURL struct {
+	Raw      string   `json:"raw"`
+	Protocol string   `json:"protocol,omitempty"`
+	Host     []string `json:"host,omitempty"`
+	Port     string   `json:"port,omitempty"`
+	Path     []string `json:"path,omitempty"`
+	Query    []pmKV   `json:"query,omitempty"`
+	Hash     string   `json:"hash,omitempty"`
+	Variable []pmKV   `json:"variable,omitempty"`
+}
+
+// ExportPostman writes items and the variables as a Postman collection
+// v2.1, the variables as the collection's.
+func ExportPostman(name string, items []*model.Node, env []model.KV) ([]byte, error) {
+	var c pmOutCollection
+	c.Info.Name, c.Info.Schema = name, pmSchema
+	c.Item = pmItems(items)
+	for _, kv := range env {
+		c.Variable = append(c.Variable, pmKV{Key: kv.Key, Value: kv.Value, Disabled: !kv.Enabled})
+	}
+	return json.MarshalIndent(c, "", "  ")
+}
+
+func pmItems(nodes []*model.Node) []pmOutItem {
+	items := []pmOutItem{}
+	for _, n := range nodes {
+		it := pmOutItem{Name: n.Name}
+		if n.Folder != nil {
+			kids := pmItems(n.Folder.Children)
+			it.Item = &kids
+		} else {
+			it.Request = pmOut(n.Request)
+		}
+		items = append(items, it)
+	}
+	return items
+}
+
+func pmOut(r *model.Request) *pmOutRequest {
+	out := &pmOutRequest{Method: r.Method, Header: pmKVs(r.Headers), URL: pmOutURLOf(r)}
+	switch r.Body.Kind {
+	case model.BodyJSON, model.BodyText:
+		out.Body = &pmBody{Mode: "raw", Raw: r.Body.Text, Options: &pmOptions{}}
+		out.Body.Options.Raw.Language = map[string]string{model.BodyJSON: "json", model.BodyText: "text"}[r.Body.Kind]
+	case model.BodyForm:
+		out.Body = &pmBody{Mode: "urlencoded", URLEncoded: pmKVs(r.Body.Form)}
+	case model.BodyMultipart:
+		out.Body = &pmBody{Mode: "formdata", FormData: []pmKV{}}
+		for _, kv := range r.Body.Form {
+			f := pmKV{Key: kv.Key, Value: kv.Value, Disabled: !kv.Enabled, Type: "text"}
+			if kv.File {
+				f.Value, f.Type, f.Src = nil, "file", kv.Value
+			}
+			out.Body.FormData = append(out.Body.FormData, f)
+		}
+	}
+	str := func(k, v string) pmKV { return pmKV{Key: k, Value: v, Type: "string"} }
+	switch a := r.Auth; a.Kind {
+	case model.AuthBasic:
+		out.Auth = &pmAuth{Type: "basic", Basic: []pmKV{str("username", a.Username), str("password", a.Password)}}
+	case model.AuthBearer:
+		out.Auth = &pmAuth{Type: "bearer", Bearer: []pmKV{str("token", a.Token)}}
+	case model.AuthAPIKey:
+		in := "header"
+		if a.InQuery {
+			in = "query"
+		}
+		out.Auth = &pmAuth{Type: "apikey", APIKey: []pmKV{str("key", a.Key), str("value", a.Value), str("in", in)}}
+	}
+	return out
+}
+
+func pmKVs(list []model.KV) []pmKV {
+	out := []pmKV{}
+	for _, kv := range list {
+		out = append(out, pmKV{Key: kv.Key, Value: kv.Value, Disabled: !kv.Enabled})
+	}
+	return out
+}
+
+// pmOutURLOf splits the URL as Postman does: the host on dots, the path on
+// slashes. The query comes from the request's list, which also has the
+// disabled parameters the URL leaves out.
+func pmOutURLOf(r *model.Request) pmOutURL {
+	u := pmOutURL{Raw: r.URL}
+	rest := r.URL
+	if i := strings.Index(rest, "#"); i >= 0 {
+		rest, u.Hash = rest[:i], rest[i+1:]
+	}
+	rest, _, _ = strings.Cut(rest, "?")
+	if p, after, ok := strings.Cut(rest, "://"); ok {
+		u.Protocol, rest = p, after
+	}
+	host, path, hasPath := strings.Cut(rest, "/")
+	if i := strings.LastIndex(host, ":"); i >= 0 && !strings.Contains(host[i:], "]") {
+		host, u.Port = host[:i], host[i+1:]
+	}
+	if host != "" {
+		u.Host = strings.Split(host, ".")
+	}
+	if hasPath {
+		u.Path = strings.Split(path, "/")
+	}
+	for _, q := range r.Query {
+		u.Query = append(u.Query, pmKV{Key: q.Key, Value: q.Value, Disabled: !q.Enabled})
+	}
+	for _, p := range r.Path {
+		u.Variable = append(u.Variable, pmKV{Key: p.Key, Value: p.Value})
+	}
+	return u
 }
