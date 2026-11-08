@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"mime"
 	"slices"
 	"strings"
@@ -151,8 +150,8 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 	request := func() {
 		ui.Column(c).Fill().Children(func() {
 			ui.Row(c).AlignItems(ui.Center).Padding(0, 12).Children(func() {
-				ui.Tabs(c, &tb.reqTab, counted("Params", r.Query), counted("Path", r.Path),
-					counted("Headers", r.Headers), bodyLabel(&r.Body), authLabel(&r.Auth)).MinWidth(0).Shrink(1)
+				countTabs(c, &tb.reqTab, tabItem{"Params", counted(r.Query)}, tabItem{"Path", counted(r.Path)},
+					tabItem{"Headers", counted(r.Headers)}, tabItem{label: bodyLabel(&r.Body)}, tabItem{label: authLabel(&r.Auth)}).MinWidth(0).Shrink(1)
 				ui.Spacer(c)
 				svg, label := splitRightIcon, "Response on the Right"
 				if a.responseRight {
@@ -256,7 +255,7 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 				}
 			})
 		}
-		ui.Tabs(c, &tb.respTab, "Body", fmt.Sprintf("Headers %d", len(resp.Headers)))
+		countTabs(c, &tb.respTab, tabItem{label: "Body"}, tabItem{"Headers", len(resp.Headers)})
 	})
 	if len(resp.Body) > bigBody {
 		ui.Text(c, "A large body: shown as it came, without formatting.").FontSize(12).
@@ -291,18 +290,15 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 	}
 }
 
-// counted adds how many rows are on to a tab's label, as "Headers 2".
-func counted(label string, rows []model.KV) string {
+// counted is how many rows are on, for a tab's bubble.
+func counted(rows []model.KV) int {
 	n := 0
 	for _, kv := range rows {
 		if kv.Enabled && kv.Key != "" {
 			n++
 		}
 	}
-	if n == 0 {
-		return label
-	}
-	return fmt.Sprintf("%s %d", label, n)
+	return n
 }
 
 var bodyKinds = []string{model.BodyNone, model.BodyJSON, model.BodyText, model.BodyForm, model.BodyMultipart}

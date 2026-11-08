@@ -1,6 +1,10 @@
 package app
 
-import "github.com/egoist/mygo/ui"
+import (
+	"fmt"
+
+	"github.com/egoist/mygo/ui"
+)
 
 func icon(shapes string) *ui.SVG {
 	return ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">` + shapes + `</svg>`))
@@ -54,6 +58,67 @@ func emptyState(c *ui.Context, title, hint string) {
 		ui.Text(c, title).FontSize(15).FontWeight(600).TextColor(t.TextMuted)
 		if hint != "" {
 			ui.Text(c, hint).FontSize(12).TextColor(t.TextMuted).Opacity(0.8)
+		}
+	})
+}
+
+// tabItem is a tab of countTabs: a label with a count shown in a bubble
+// after it when above zero.
+type tabItem struct {
+	label string
+	count int
+}
+
+// countTabs is ui.Tabs with a bubble for each tab's count. It copies the
+// look of ui.Tabs, since a tab there can only hold a string. The tab's
+// accessible name keeps the count, as "Headers 2".
+func countTabs(c *ui.Context, selected *int, items ...tabItem) ui.Element {
+	t := c.Theme()
+	line := t.Accent
+	if !c.WindowActive() && t.InactiveAccent != t.Accent {
+		// What ui.Tabs fades to is not exported; muted text is near it.
+		line = t.TextMuted
+		if t.InactiveAccent != ui.Transparent {
+			line = t.InactiveAccent
+		}
+	}
+	tabs := ui.TabsBase(c, selected, len(items))
+	return tabs.List.Gap(t.Space(1)).Children(func() {
+		for i, it := range items {
+			on := i == *selected
+			name := it.label
+			if it.count > 0 {
+				name = fmt.Sprintf("%s %d", it.label, it.count)
+			}
+			tab := tabs.Tab(i).Padding(t.Space(2), t.Space(3)).Radius(t.Radius).
+				AlignItems(ui.Center).Gap(5).Label(name).TextColor(t.TextMuted)
+			if on {
+				tab.TextColor(t.Text).FontWeight(600)
+			} else if tab.Hovered() {
+				tab.TextColor(t.Text)
+			}
+			tab.DrawOver(func(p *ui.Painter, r ui.Rect) {
+				if on {
+					in, h := t.Space(1.5), t.Space(0.5)
+					p.Fill(ui.Rect{X: r.X + in, Y: r.Y + r.H - h, W: r.W - 2*in, H: h}, line, h/2)
+				}
+			})
+			tab.Children(func() {
+				ui.Text(c, it.label).SingleLine()
+				if it.count == 0 {
+					return
+				}
+				bg, fg := t.SurfaceHover, t.TextMuted
+				if on {
+					bg, fg = t.Accent, t.AccentText
+				}
+				// MinWidth = Height keeps one digit a circle; more digits
+				// stretch it to a pill.
+				ui.Row(c).Height(16).MinWidth(16).Padding(0, 4).Radius(8).Center().Background(bg).
+					Children(func() {
+						ui.Text(c, fmt.Sprint(it.count)).FontSize(10).FontWeight(600).TextColor(fg).SingleLine()
+					})
+			})
 		}
 	})
 }
