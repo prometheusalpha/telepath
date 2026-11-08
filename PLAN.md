@@ -222,6 +222,12 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Rê chuột lên `{{name}}` trong URL, Params, Path, Headers, Form: card hiện tên, giá trị (secret thì che) và nút copy giá trị; biến chưa có thì báo. Card ở nguyên khi chuột đi xuống nó.
 - Ô key của Headers: gợi ý tên header và gợi ý biến gộp vào một danh sách, biến đứng trước.
 - Auth: nút copy cạnh từng ô, chép giá trị đã thay biến.
+- 11.3. jsonpath để lọc và đọc trong response json (xong)
+  - 11.3.1. `internal/jsonpath` tự viết (không thêm dependency): decode bằng `json.Decoder.Token()` thành cây node riêng, giữ thứ tự key và số dạng `json.Number`. Cú pháp theo RFC 9535: `$`, `.name`, `['name']`, `[0]`, `[-1]`, `[*]`, `..`, `[a:b:c]`, `[0,2]`, filter `?(@.x == 1)` (`== != < <= > >=`, `&& || !`, tồn tại `?(@.x)`). `Compile` báo lỗi kèm vị trí; `Singular()` cho biết biểu thức chỉ trỏ tới tối đa một giá trị.
+  - 11.3.2. Chạy filter trong goroutine, có debounce, kết quả về qua `a.update` và so `seq`. Cây đã parse giữ trong tab, dùng lại; kết quả hiện ở editor riêng, không đè `tb.body`. Biểu thức singular thì hiện giá trị trần, còn lại là mảng. Gửi lại request thì filter vẫn giữ và áp lên response mới. Body > 2 MB vẫn filter được.
+  - 11.3.3. Ô filter mono dưới thanh Body (chỉ khi response là JSON), số match bên phải, lỗi hiện một dòng đỏ và giữ kết quả đúng gần nhất, không match thì "No match", Esc hoặc nút × trong ô để xoá. Biểu thức chỉ nằm trong tab, không lưu. Copy body chép kết quả đang thấy; Save body vẫn ghi body gốc. Không có phím tắt riêng.
+  - 11.3.4. Test bằng `ui.NewTester` (gõ filter, lỗi, Esc, gửi lại), `-race`; cập nhật Gotchas trong `CLAUDE.md`.
+- 11.4 README.md
 
 ---
 

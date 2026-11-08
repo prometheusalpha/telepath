@@ -39,10 +39,12 @@ type tab struct {
 	cancel  context.CancelFunc
 	// seq tells a response apart from those of sends canceled or replaced
 	// since, which may still arrive.
-	seq  int
-	resp *httpx.Response
-	err  error
-	body *editor.State
+	seq    int
+	resp   *httpx.Response
+	err    error
+	body   *editor.State
+	json   bool // the body is JSON, found off the main thread
+	filter filter
 	// missing are the variables the last send found no value for, which
 	// went as typed.
 	missing []string
@@ -76,6 +78,7 @@ func (a *app) send(tb *tab) {
 		// came, as indenting and highlighting it would stall the window.
 		var text string
 		big := resp != nil && len(resp.Body) > bigBody
+		isJSON := resp != nil && resp.JSON()
 		if resp != nil && !big {
 			text = resp.Pretty()
 		} else if resp != nil {
@@ -86,10 +89,10 @@ func (a *app) send(tb *tab) {
 				return
 			}
 			tb.sending, tb.cancel = false, nil
-			tb.resp, tb.err = resp, err
+			tb.resp, tb.err, tb.json = resp, err, isJSON
 			if resp != nil {
 				buf := editor.NewBuffer(text)
-				if !big && resp.JSON() {
+				if !big && isJSON {
 					buf.SetLanguage(editor.LanguageNamed("JSON"))
 				}
 				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big, NoScrollPastEnd: true}
@@ -241,7 +244,7 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		ui.Text(c, resp.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
 		if iconButton(c, copyIcon, "Copy body").Clicked() {
-			c.Services().WriteClipboard(tb.body.Buffer.String())
+			c.Services().WriteClipboard(tb.shown().Buffer.String())
 			c.Toast("Copied the body")
 		}
 		if iconButton(c, downloadIcon, "Save body").Clicked() {
@@ -266,8 +269,15 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 			emptyState(c, "Empty body", "")
 			return
 		}
-		styleCode(c, tb.body)
-		editor.View(c, tb.body).Grow(1).FillWidth().Label("Response body")
+		if tb.json {
+			a.filterBar(c, tb)
+			if tb.filter.filtered != nil && tb.filter.count == 0 {
+				emptyState(c, "No match", "")
+				return
+			}
+		}
+		styleCode(c, tb.shown())
+		editor.View(c, tb.shown()).Grow(1).FillWidth().Label("Response body")
 	case 1:
 		cols := []ui.TableColumn{{Title: "Name", Width: 220}, {Title: "Value"}}
 		ui.Table(c, nil, cols, len(resp.Headers), func(row, col int) {

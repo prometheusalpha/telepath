@@ -25,8 +25,9 @@ go vet ./... && go test ./...
 - `internal/model/url.go`: đồng bộ URL ↔ Query, nhận diện `:name` trong path.
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
+- `internal/jsonpath`: JSONPath theo RFC 9535 (không có hàm `length()`/`match()`…), dùng cho ô filter của response. `Value` riêng giữ thứ tự key và chữ của số.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
+- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
 - Root chỉ có `main.go` gọi `app.Run()`; code mới không để ở root.
 
 ## Gotchas
@@ -108,6 +109,15 @@ go vet ./... && go test ./...
 - `ParseCurl` tách lệnh theo kiểu shell (`splitShell`, có hỗ trợ `$'…'` của Chrome). Flag không ảnh hưởng tới request thì bỏ qua; flag có kèm giá trị phải nằm trong `ignoredWithValue`, không thì giá trị đó bị coi là URL. Header `Authorization` kiểu Bearer, hoặc Basic giải mã được ra `user:pass`, được chuyển vào Auth và bỏ khỏi Headers (`authFromHeader`); header này thắng `-u`, giống curl.
 - Dialog chạy trong goroutine (`a.openFile`, `a.saveFile`); kết quả về qua `win.Update`, thông báo đặt vào `a.toast` để frame sau hiện ra. `newApp` gán sẵn bản không làm gì cho các hook dialog, test thì thay bằng bản giả.
 
+### Filter response (JSONPath)
+- Không decode vào `map[string]any`: kết quả sẽ bị xếp key theo alphabet và số mất độ chính xác. `jsonpath.Parse` dùng `json.Decoder.Token()` dựng `Value` giữ nguyên thứ tự.
+- Biểu thức không có `$` ở đầu vẫn được nhận (`data.items`, `.data`, `[0]`), vì người dùng hay gõ thiếu.
+- `tab.json` được tính trong goroutine gửi request; đừng gọi `resp.JSON()` mỗi frame (body không có Content-Type thì nó quét `json.Valid` toàn bộ).
+- Filter chạy sau `filterDelay` kể từ lần gõ cuối, trong goroutine, so `filter.seq` như lúc gửi request. `filterBar` chạy lại khi biểu thức hoặc response khác với lần chạy trước (`ran`/`ranOn`), nên response mới được filter ngay, không phải chờ gõ. Cây đã parse (`doc`) được dùng lại cho đến khi có response khác.
+- Biểu thức lỗi thì giữ kết quả đúng gần nhất, trừ khi kết quả đó thuộc response cũ (`from`). Kết quả lớn hơn `bigBody` thì không tô màu, không soft wrap.
+- Biểu thức singular (`Singular()`: chỉ có name/index) hiện giá trị trần, còn lại hiện mảng, kể cả khi chỉ có một match. Copy body chép `tb.shown()` (kết quả đang thấy); Save body ghi body gốc.
+- Esc trong ô filter là `OnTextKey` + `SetText("")`; nút × (`Attach` vào mép phải ô, ô chừa `PaddingEnd(30)`) gán `expr = ""` rồi focus lại ô qua `filter.input`. `Changed()` không báo cả hai việc này, nên điều kiện chạy lại dựa trên việc so `expr` với `ran`.
+
 ### Lưu dữ liệu
 - Mọi chỗ sửa workspace phải gọi `a.changed()` (reindex + đánh dấu dirty). `autosave` ghi sau `saveDelay` kể từ lần sửa cuối, đặt lịch bằng `c.After`.
 - Trạng thái mở/đóng folder nằm ở `a.files.Open`, chỉ chép sang `Folder.Open` lúc `flush` (lần ghi kế tiếp hoặc khi thoát app qua `OnBeforeQuit`).
@@ -128,3 +138,6 @@ go vet ./... && go test ./...
 - Hai element trùng tên (chữ hiển thị và label của ô nhập) thì `tt.Click` bấm vào cái đầu tiên. Dùng `ui.Field`, hoặc đặt label cho ô nhập khác đi.
 - Test cho tương tác chuột phải mô phỏng đúng thứ người dùng làm (bấm nhanh liên tiếp, bấm vào vùng thụt lề, `ClickAt`), không chỉ `Click` vào giữa label.
 - Kiểm tra giao diện bằng mắt: viết `shot_test.go` tạm trong `internal/app`, encode `tt.Image()` ra PNG trong `/tmp` (`SetDark`, `SetTitleBar` để giống app thật), xem xong thì xoá cả file test lẫn ảnh.
+
+### PLAN.md
+- Giữ nguyên đánh số của task trong file PLAN.md nếu có
