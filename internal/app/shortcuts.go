@@ -122,6 +122,8 @@ var commands = []command{
 			a.closeOthers(a.active)
 		}
 	}},
+	{"next-tab", "Show Next Tab", keys{ui.Ctrl, ui.KeyTab}, func(a *app) { a.cycleTab(1) }},
+	{"previous-tab", "Show Previous Tab", keys{ui.Ctrl | ui.Shift, ui.KeyTab}, func(a *app) { a.cycleTab(-1) }},
 	// The menu closes the window, as only it has the window.
 	{"close-window", "Close Window", keys{}, nil},
 	{"import", "Import Collection…", keys{ui.Cmd, ui.KeyO}, (*app).importFile},

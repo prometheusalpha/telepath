@@ -53,6 +53,16 @@ func (a *app) pruneTabs() {
 	}
 }
 
+// cycleTab shows the tab d after the open one, going round past the ends
+// as in browsers.
+func (a *app) cycleTab(d int) {
+	if len(a.tabs) == 0 {
+		return
+	}
+	a.active = ((a.active+d)%len(a.tabs) + len(a.tabs)) % len(a.tabs)
+	a.touch()
+}
+
 func (a *app) current() *tab {
 	if a.active < 0 || a.active >= len(a.tabs) {
 		return nil

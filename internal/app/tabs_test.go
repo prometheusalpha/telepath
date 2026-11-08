@@ -79,3 +79,30 @@ func TestSidebarFollowsTheTab(t *testing.T) {
 		t.Errorf("after closing, chosen %q", a.selected)
 	}
 }
+
+func TestCycleTabs(t *testing.T) {
+	ws := &model.Workspace{}
+	for _, name := range []string{"one", "two", "three"} {
+		ws.Add(model.NewRequest(name), "")
+	}
+	a := newApp(ws, "")
+	tt := ui.NewTester(a.view, 1200, 780)
+	for _, n := range ws.Items {
+		a.openTab(n.ID)
+	}
+	tt.Frame()
+	for _, want := range []int{0, 1} {
+		tt.Key(ui.Ctrl, ui.KeyTab)
+		tt.Frame()
+		if a.active != want {
+			t.Fatalf("⌃⇥: tab %d, want %d", a.active, want)
+		}
+	}
+	for _, want := range []int{0, 2} {
+		tt.Key(ui.Ctrl|ui.Shift, ui.KeyTab)
+		tt.Frame()
+		if a.active != want {
+			t.Fatalf("⌃⇧⇥: tab %d, want %d", a.active, want)
+		}
+	}
+}

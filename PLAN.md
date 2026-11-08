@@ -198,7 +198,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - Kéo thả trong sidebar để sắp xếp / chuyển folder (`Draggable`/drag-and-drop).
 - Khôi phục tab đang mở + tab active + kích thước split khi mở lại app.
-- Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌘L focus URL.
+- Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌃⇥/⌃⇧⇥ tab sau/trước (vòng tròn), ⌘L focus URL.
 - Response: nút copy body, lưu body ra file, cảnh báo/ cắt hiển thị khi response quá lớn.
 - Chọn vị trí khu response: bên dưới (như hiện tại) hoặc bên phải request (chia trái/phải). Có nút đổi nhanh trên thanh response + mục trong menu View, lưu lựa chọn; mỗi vị trí nhớ kích thước split riêng.
 - Gợi ý biến khi gõ `{{` trong ô URL và các ô của bảng (Params, Path, Headers, Body form, Auth): hiện danh sách biến kèm giá trị (che biến secret), lọc theo chữ đang gõ, Enter/Tab chèn `{{name}}`.
@@ -219,7 +219,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - Paste lệnh `curl …` vào ô URL: ghi đè request đang mở (method, URL, query, header, body, auth), giữ tên và vị trí; lệnh đọc không được thì báo toast, text khác paste như thường.
 - ⇧⌘W là Close Other Tabs; Close Window không có phím tắt.
-- Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
+- Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Show Next/Previous Tab (menu View), Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
 - Rê chuột lên `{{name}}` trong URL, Params, Path, Headers, Form: card hiện tên, giá trị (secret thì che) và nút copy giá trị; biến chưa có thì báo. Card ở nguyên khi chuột đi xuống nó.
 - Ô key của Headers: gợi ý tên header và gợi ý biến gộp vào một danh sách, biến đứng trước.
 - Auth: nút copy cạnh từng ô, chép giá trị đã thay biến.

@@ -81,6 +81,7 @@ Default shortcuts (change them in **Settings > Shortcuts**):
 | Variables | ⌘E |
 | Import collection / cURL | ⌘O / ⇧⌘O |
 | Close tab / other tabs | ⌘W / ⇧⌘W |
+| Next / previous tab | ⌃⇥ / ⌃⇧⇥ |
 | Go to tab 1…8 / last tab | ⌘1…⌘8 / ⌘9 |
 | Settings | ⌘, |
 
