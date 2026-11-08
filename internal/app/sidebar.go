@@ -101,6 +101,14 @@ func (a *app) sidebar(c *ui.Context) {
 	}
 }
 
+// selectRow notes the ID of the row chosen.
+func (a *app) selectRow() {
+	a.selected = ""
+	if a.row >= 0 && a.row < a.files.Rows() {
+		a.selected = a.files.Item(a.row)
+	}
+}
+
 func (a *app) outline(c *ui.Context) {
 	if a.selectID != "" {
 		for i := range a.files.Rows() {
@@ -112,6 +120,9 @@ func (a *app) outline(c *ui.Context) {
 		}
 	}
 	a.files.List.Selected = &a.row
+	// The rows color what sits on the selection, so they need the row
+	// chosen now, not last frame's; the outline may still change it below.
+	a.selectRow()
 	// The prefix only notes where the row sits: node draws the indent and
 	// the arrow inside its own row, so a press anywhere on it lands there.
 	a.files.Prefix = func(r ui.OutlineRow) { a.depth, a.open = r.Depth, r.Open }
@@ -147,10 +158,7 @@ func (a *app) outline(c *ui.Context) {
 		later = func() { a.move(ids, "", model.After) }
 	}
 
-	a.selected = ""
-	if a.row >= 0 && a.row < a.files.Rows() {
-		a.selected = a.files.Item(a.row)
-	}
+	a.selectRow()
 	if n := a.tree.byID[a.selected]; n != nil && a.renaming == "" {
 		// Enter renames, as in Finder, and ⌘↓ opens; a click opens too. The
 		// outline takes Enter itself and reports it as Submitted, as it

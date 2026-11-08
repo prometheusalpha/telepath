@@ -106,3 +106,33 @@ func TestCycleTabs(t *testing.T) {
 		}
 	}
 }
+
+// The row a tab change selects shows as chosen in the first frame, its
+// badge in AccentText as well as its background.
+func TestSidebarSelectsInOneFrame(t *testing.T) {
+	ws := &model.Workspace{}
+	for _, name := range []string{"one", "two"} {
+		ws.Add(model.NewRequest(name), "")
+	}
+	a := newApp(ws, "")
+	tt := ui.NewTester(a.view, 1200, 780)
+	for _, n := range ws.Items {
+		a.openTab(n.ID)
+	}
+	tt.Frame()
+	tt.Frame()
+	// As the menu does, before the frame.
+	a.cycleTab(1)
+	tt.Frame()
+	first := tt.Image()
+	tt.Frame()
+	tt.Frame()
+	last := tt.Image()
+	for y := range first.Bounds().Dy() {
+		for x := range int(a.sidebarWidth) {
+			if first.At(x, y) != last.At(x, y) {
+				t.Fatalf("the sidebar changed after the first frame, at %d,%d", x, y)
+			}
+		}
+	}
+}
