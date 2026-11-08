@@ -131,7 +131,7 @@ func (a *app) runFilter(tb *tab, expr string) {
 			if !big {
 				buf.SetLanguage(editor.LanguageNamed("JSON"))
 			}
-			f.filtered = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big, NoScrollPastEnd: true}
+			f.filtered = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big}
 			f.from, f.count = resp, count
 		})
 	}()

@@ -94,7 +94,7 @@ func (a *app) send(tb *tab) {
 				if !big && isJSON {
 					buf.SetLanguage(editor.LanguageNamed("JSON"))
 				}
-				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big, NoScrollPastEnd: true}
+				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big}
 			}
 		})
 	}()
@@ -161,7 +161,13 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 					a.setResponseRight(!a.responseRight)
 				}
 			})
-			ui.Scroll(c).Grow(1).Children(func() { a.requestPane(c, tb, r) })
+			// The body editor scrolls on its own, so it takes the pane's
+			// height instead of sitting in the Scroll at a fixed size.
+			if tb.reqTab == 3 && (r.Body.Kind == model.BodyJSON || r.Body.Kind == model.BodyText) {
+				ui.Column(c).Grow(1).MinHeight(0).Children(func() { a.requestPane(c, tb, r) })
+			} else {
+				ui.Scroll(c).Grow(1).Children(func() { a.requestPane(c, tb, r) })
+			}
 		})
 	}
 	response := func() { a.responseView(c, tb) }
@@ -371,7 +377,7 @@ func (a *app) bodyPane(c *ui.Context, tb *tab, r *model.Request) {
 	case model.BodyJSON, model.BodyText:
 		st := a.bodyEditor(tb, r)
 		styleCode(c, st)
-		editor.View(c, st).Height(260).FillWidth().Label("Request body")
+		editor.View(c, st).Grow(1).MinHeight(120).FillWidth().Label("Request body")
 		if text := st.Buffer.String(); text != r.Body.Text {
 			r.Body.Text = text
 			a.changed()
@@ -388,7 +394,7 @@ func (a *app) bodyPane(c *ui.Context, tb *tab, r *model.Request) {
 // shows; from then on the editor's buffer leads and the request follows.
 func (a *app) bodyEditor(tb *tab, r *model.Request) *editor.State {
 	if tb.bodyEdit == nil {
-		tb.bodyEdit = &editor.State{Buffer: editor.NewBuffer(r.Body.Text), NoScrollPastEnd: true}
+		tb.bodyEdit = &editor.State{Buffer: editor.NewBuffer(r.Body.Text)}
 		setBodyLanguage(tb.bodyEdit, r.Body.Kind)
 	}
 	return tb.bodyEdit
