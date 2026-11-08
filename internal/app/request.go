@@ -428,6 +428,11 @@ func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
 					in.Password()
 				}
 				changed = a.suggestVars(c, in, value, "Auth "+label) || in.Changed() || changed
+				// What is sent, the {{name}}s filled.
+				if iconButton(c, copyIcon, "Copy "+label).Clicked() {
+					c.Services().WriteClipboard(a.env.Expand(*value, nil))
+					c.Toast("Copied the " + strings.ToLower(label))
+				}
 				if !secret {
 					return
 				}

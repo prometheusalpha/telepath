@@ -49,3 +49,21 @@ func TestBearerAuthSends(t *testing.T) {
 		t.Errorf("server saw Authorization %q", got)
 	}
 }
+
+func TestCopyAuthFillsVariables(t *testing.T) {
+	a, n, tt := suggestApp()
+	n.Request.Auth = model.Auth{Kind: model.AuthBasic, Username: "me@{{base}}", Password: "{{token}}"}
+	a.changed()
+	tt.Click("Auth")
+	tt.Frame()
+	tt.Click("Copy Username")
+	tt.Frame()
+	if tt.Clipboard() != "me@https://a.dev" {
+		t.Errorf("copied the username as %q", tt.Clipboard())
+	}
+	tt.Click("Copy Password")
+	tt.Frame()
+	if tt.Clipboard() != "t" || n.Request.Auth.Password != "{{token}}" {
+		t.Errorf("copied the password as %q, auth %+v", tt.Clipboard(), n.Request.Auth)
+	}
+}
