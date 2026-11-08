@@ -223,6 +223,8 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Rê chuột lên `{{name}}` trong URL, Params, Path, Headers, Form: card hiện tên, giá trị (secret thì che) và nút copy giá trị; biến chưa có thì báo. Card ở nguyên khi chuột đi xuống nó.
 - Ô key của Headers: gợi ý tên header và gợi ý biến gộp vào một danh sách, biến đứng trước.
 - Auth: nút copy cạnh từng ô, chép giá trị đã thay biến.
+- Auth Bearer: token (đã thay biến) có dạng JWT thì hiện bảng claim của payload ngay dưới ô Token, giữ thứ tự key; `exp`/`iat`/`nbf`/`auth_time` kèm ngày giờ, `exp` đã qua thì đỏ và ghi expired. Tên claim chọn/copy được, cạnh mỗi value có nút copy (chép value gốc, không kèm ngày). Không kiểm chữ ký.
+- Tạo request mới (menu +, ⌘N, menu của sidebar) thì mở luôn tab của nó, vẫn đang đổi tên ở sidebar.
 - 11.3. jsonpath để lọc và đọc trong response json (xong)
   - 11.3.1. `internal/jsonpath` tự viết (không thêm dependency): decode bằng `json.Decoder.Token()` thành cây node riêng, giữ thứ tự key và số dạng `json.Number`. Cú pháp theo RFC 9535: `$`, `.name`, `['name']`, `[0]`, `[-1]`, `[*]`, `..`, `[a:b:c]`, `[0,2]`, filter `?(@.x == 1)` (`== != < <= > >=`, `&& || !`, tồn tại `?(@.x)`). `Compile` báo lỗi kèm vị trí; `Singular()` cho biết biểu thức chỉ trỏ tới tối đa một giá trị.
   - 11.3.2. Chạy filter trong goroutine, có debounce, kết quả về qua `a.update` và so `seq`. Cây đã parse giữ trong tab, dùng lại; kết quả hiện ở editor riêng, không đè `tb.body`. Biểu thức singular thì hiện giá trị trần, còn lại là mảng. Gửi lại request thì filter vẫn giữ và áp lên response mới. Body > 2 MB vẫn filter được.

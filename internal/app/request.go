@@ -463,6 +463,7 @@ func (a *app) authPane(c *ui.Context, tb *tab, r *model.Request) {
 			field("Password", &au.Password, true)
 		case model.AuthBearer:
 			field("Token", &au.Token, true).Description("Sent as Authorization: Bearer <token>.")
+			a.jwtPayload(c, au.Token)
 		case model.AuthAPIKey:
 			field("Key", &au.Key, false)
 			field("Value", &au.Value, true)

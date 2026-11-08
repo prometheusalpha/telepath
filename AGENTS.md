@@ -27,7 +27,7 @@ go vet ./... && go test ./...
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/jsonpath`: JSONPath theo RFC 9535 (không có hàm `length()`/`match()`…), dùng cho ô filter của response. `Value` riêng giữ thứ tự key và chữ của số.
 - `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
+- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `jwt.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
 - Root chỉ có `main.go` gọi `app.Run()`; code mới không để ở root.
 
 ## Gotchas
@@ -79,6 +79,7 @@ go vet ./... && go test ./...
 - API key trong query được nối vào `RawQuery`; đừng dùng `URL.Query().Encode()` vì nó sắp xếp lại thứ tự query.
 - Form có label thì dùng `ui.Form` + `ui.Field` (bấm vào label sẽ focus control). Control nào phải giữ đúng chiều rộng của nó (như Segmented) thì bọc trong `ui.Row`, không thì bị kéo dài theo field.
 - `TextInput.Password()` chỉ che chữ trong những frame có gọi nó; muốn hiện thì frame đó không gọi nữa.
+- Bảng Payload dưới ô Token (Bearer) decode token đã thay biến mỗi frame, kể cả khi ô đang bị `Password()` che. Chỉ nhận JWS ba phần; token không có dạng đó (opaque) thì không hiện gì. Dùng `jsonpath.Parse` để giữ thứ tự claim và chữ của số.
 - Credential (password, token, value của API key) và value của biến secret được mã hoá trong `workspace.json` (xem phần Lưu dữ liệu).
 
 ### Biến
