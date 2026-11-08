@@ -99,3 +99,72 @@ func TestSuggestKeysAndClicks(t *testing.T) {
 		t.Error("the list came back after Escape")
 	}
 }
+
+func TestSuggestHeaderNamesAndVariables(t *testing.T) {
+	a, n, tt := suggestApp()
+	tt.Click("Headers")
+	tt.Frame()
+	// The blank row's input turns into the first row's at the first key:
+	// the names still show.
+	tt.Click("Header new key")
+	tt.Type("c")
+	tt.Frame()
+	if !tt.HasText("Name Content-Type") || !tt.HasText("Name Accept") {
+		t.Fatalf("after one key: %q", tt.Texts())
+	}
+	tt.Type("ont")
+	tt.Frame()
+	if !tt.HasText("Name Content-Type") || tt.HasText("Name Accept") {
+		t.Fatalf("names for cont: %q", tt.Texts())
+	}
+	// None is taken until Down: Enter keeps a name typed in full.
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if n.Request.Headers[0].Key != "cont" {
+		t.Fatalf("Enter took a name: %q", n.Request.Headers[0].Key)
+	}
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	tt.Type("!")
+	tt.Frame()
+	if n.Request.Headers[0].Key != "Content-Type!" || tt.HasText("Name Content-Type") {
+		t.Fatalf("key %q, texts %q", n.Request.Headers[0].Key, tt.Texts())
+	}
+
+	// After {{ the variables come, first and chosen.
+	tt.Click("Header key 1")
+	tt.Key(ui.Cmd, ui.KeyRight)
+	tt.Type("{{to")
+	tt.Frame()
+	if !tt.HasText("Variable token") {
+		t.Fatalf("no variables: %q", tt.Texts())
+	}
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if n.Request.Headers[0].Key != "Content-Type!{{token}}" {
+		t.Fatalf("key %q", n.Request.Headers[0].Key)
+	}
+
+	// Escape closes the names until typing again; a click takes one. The
+	// pointer leaves {{token}} first, whose card covers the row below.
+	tt.Move(0, 0)
+	tt.Frame()
+	tt.Click("Header new key")
+	tt.Type("x-")
+	tt.Frame()
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	if tt.HasText("Name X-API-Key") {
+		t.Fatal("Escape left the names")
+	}
+	tt.Type("r")
+	tt.Frame()
+	if err := tt.Click("Name X-Request-ID"); err != nil {
+		t.Fatalf("%v: %q", err, tt.Texts())
+	}
+	tt.Frame()
+	if n.Request.Headers[1].Key != "X-Request-ID" || a.suggest.label != "" {
+		t.Errorf("after a click: %+v", n.Request.Headers)
+	}
+}

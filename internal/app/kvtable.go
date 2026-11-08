@@ -112,23 +112,16 @@ func (a *app) kvTable(c *ui.Context, rows *[]model.KV, draft *model.KV, o kvOpti
 }
 
 func (a *app) keyInput(c *ui.Context, key *string, label string, muted bool, o kvOptions) bool {
-	var in ui.Element
-	if o.suggestions != nil {
-		in = ui.Autocomplete(c, key, o.suggestions)
-	} else {
-		in = ui.TextInput(c, key)
-	}
-	in.Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).FontSize(12).Placeholder("Key").Label(label)
+	in := ui.TextInput(c, key).Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).FontSize(12).Placeholder("Key").Label(label)
 	if muted {
 		in.TextColor(c.Theme().TextMuted)
 	} else if !o.secrets {
 		a.highlightVars(c, in, *key, label, 12)
 	}
-	// The header keys' own suggestions are names, not variables.
-	if o.secrets || o.suggestions != nil {
+	if o.secrets {
 		return in.Changed()
 	}
-	return a.suggestVars(c, in, key, label) || in.Changed()
+	return a.suggestKey(c, in, key, label, o.suggestions) || in.Changed()
 }
 
 func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, o kvOptions, setFile func(string)) bool {
