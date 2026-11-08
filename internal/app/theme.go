@@ -14,6 +14,8 @@ var (
 	darkTheme  = newTheme(ui.DarkTheme())
 	lightCode  = newCodeTheme(lightTheme)
 	darkCode   = newCodeTheme(darkTheme)
+	lightSplit = lineless(lightTheme)
+	darkSplit  = lineless(darkTheme)
 )
 
 // mono is the family of code, URLs and key/value text, monoFeatures the
@@ -67,6 +69,15 @@ func newTheme(t *ui.Theme) *ui.Theme {
 		t.Border = ui.Hex("#34353b")
 	}
 	return t
+}
+
+// lineless is t for the sidebar's Split alone, which draws its divider in
+// t.Border: a straight line beside the card's rounded corners. The divider
+// still shows in the accent while hovered or dragged.
+func lineless(t *ui.Theme) *ui.Theme {
+	s := *t
+	s.Border = ui.Transparent
+	return &s
 }
 
 type themeChoice struct {

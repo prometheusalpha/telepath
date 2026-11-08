@@ -234,11 +234,6 @@ func (a *app) autosave(c *ui.Context) {
 func (a *app) view(c *ui.Context) {
 	applyTheme(c)
 	t := c.Theme()
-	if c.Vibrancy() {
-		c.Root().Background(ui.Transparent)
-	} else {
-		c.Root().Background(sidebarColor(t))
-	}
 	// The sidebar follows the tab shown, however it came to show: a click,
 	// the keys, a tab closing, a search.
 	if tb := a.current(); tb == nil {
@@ -247,8 +242,22 @@ func (a *app) view(c *ui.Context) {
 		a.followed = tb.id
 		a.reveal(tb.id)
 	}
-	ui.Split(c, &a.sidebarWidth, func() { a.sidebar(c) }, func() { a.content(c) }).
-		SplitReset(240).Fill()
+	// The Split reads the theme as it is built; its panes get t back.
+	if t.Dark {
+		c.SetTheme(darkSplit)
+	} else {
+		c.SetTheme(lightSplit)
+	}
+	ui.Split(c, &a.sidebarWidth, func() {
+		c.SetTheme(t)
+		a.sidebar(c)
+	}, func() { a.content(c) }).SplitReset(240).Fill()
+	// After SetTheme, which paints the root in the theme's Background.
+	if c.Vibrancy() {
+		c.Root().Background(ui.Transparent)
+	} else {
+		c.Root().Background(sidebarColor(t))
+	}
 	a.envModal(c)
 	a.settingsModal(c)
 	a.searchModal(c)
