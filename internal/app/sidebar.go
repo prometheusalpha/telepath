@@ -380,7 +380,7 @@ func (a *app) newNode(n *model.Node) {
 }
 
 // create adds n inside the folder at, or beside the request at, and lets
-// the user name it straight away.
+// the user name it straight away. A new request opens in its tab too.
 func (a *app) create(n *model.Node, at string) {
 	a.ws.Add(n, at)
 	if p := a.tree.byID[at]; p != nil && p.Folder != nil {
@@ -388,6 +388,7 @@ func (a *app) create(n *model.Node, at string) {
 	}
 	a.changed()
 	a.selectID = n.ID
+	a.openTab(n.ID)
 	a.startRename(n)
 }
 

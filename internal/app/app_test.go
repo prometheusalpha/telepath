@@ -60,6 +60,20 @@ func TestCreateAndRename(t *testing.T) {
 	if len(kids) != 1 || kids[0].Name != "New Request" || !tt.HasText("New Request") {
 		t.Fatalf("children %q, texts %q", names(kids), tt.Texts())
 	}
+	if tb := a.current(); tb == nil || tb.id != kids[0].ID {
+		t.Error("the new request doesn't open in a tab")
+	}
+
+	// Its tab opening leaves the focus on the name being typed.
+	tt.Key(ui.Cmd, ui.KeyN)
+	tt.Frame()
+	tt.Frame()
+	tt.Type("list")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if kids = a.ws.Items[0].Folder.Children; len(kids) != 2 || kids[1].Name != "list" || a.current().id != kids[1].ID {
+		t.Errorf("children %q, tabs %d", names(kids), len(a.tabs))
+	}
 }
 
 func TestDeleteAsks(t *testing.T) {
