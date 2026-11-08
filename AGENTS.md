@@ -90,6 +90,8 @@ go vet ./... && go test ./...
 - Gợi ý biến (`suggestVars`): gọi ngay sau khi dựng ô nhập, truyền con trỏ tới giá trị và một label duy nhất. Hàm trả `true` khi đã chèn biến, vì `Changed()` của ô không báo việc này; nơi gọi phải xử lý như khi ô bị sửa (`a.changed()`, đồng bộ Query…).
 - Danh sách là `ui.Overlay` + `AttachTo` (không phải popover, để ô nhập vẫn giữ focus). Các dòng dùng `KeepFocus()`. ↑/↓/Enter/Tab/Esc bắt qua `OnTextKey`, mà hàm này có thể chạy giữa hai frame, nên vị trí con trỏ được tính lại từ `k.Text()` cộng phần chữ gõ thêm. `TextKey` không đặt được con trỏ: vị trí mong muốn ghi vào `a.caretLabel`/`a.caretAt` để frame sau gọi `SetTextSelection`.
 - Không có gợi ý ở: editor body (Text/JSON), ô key của Headers (đã có gợi ý tên header), và bảng Variables.
+- Card giá trị biến khi rê chuột (`varTip`, gọi trong `highlightVars`, nên ô nào tô màu biến thì có card; cần label duy nhất và cỡ chữ của ô). MyGo không cho biết rune nào nằm dưới con trỏ, nên `refAt` tự đo chữ bằng `c.MeasureText` (font mono, ref in đậm như lúc tô) từ sau padding + border của `TextInput`. Đổi padding, font hay weight của ô thì phải đổi theo. Ô đang focus mà chữ dài hơn ô thì đã cuộn ngang, không đo được nên không hiện card.
+- Card đóng khi chuột không nằm trên ref và cũng không trên card. Card được xét bằng `PointerPosition` sau khi đã dựng nó, không dùng `Hovered()` của frame trước (trễ một frame thì card đóng ngay khi chuột vừa rời ô nhập).
 
 ### Search (⌘K)
 - `SearchField` không cho `OnTextKey` chạm tới ô nhập bên trong, nên ↑/↓ chỉ di chuyển con trỏ chữ. Modal search dùng `TextInputBase` + `Search()` + icon tự vẽ. Enter là `Submitted()` của ô nhập, `OnTextKey` không thấy được phím này.

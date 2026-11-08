@@ -219,6 +219,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 - Paste lệnh `curl …` vào ô URL: ghi đè request đang mở (method, URL, query, header, body, auth), giữ tên và vị trí; lệnh đọc không được thì báo toast, text khác paste như thường.
 - ⇧⌘W là Close Other Tabs; Close Window không có phím tắt.
 - Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
+- Rê chuột lên `{{name}}` trong URL, Params, Path, Headers, Form: card hiện tên, giá trị (secret thì che) và nút copy giá trị; biến chưa có thì báo. Card ở nguyên khi chuột đi xuống nó.
 
 ---
 

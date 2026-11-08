@@ -122,7 +122,7 @@ func (a *app) keyInput(c *ui.Context, key *string, label string, muted bool, o k
 	if muted {
 		in.TextColor(c.Theme().TextMuted)
 	} else if !o.secrets {
-		a.highlightVars(c, in, *key)
+		a.highlightVars(c, in, *key, label, 12)
 	}
 	// The header keys' own suggestions are names, not variables.
 	if o.secrets || o.suggestions != nil {
@@ -161,7 +161,7 @@ func (a *app) valueInput(c *ui.Context, kv *model.KV, label string, muted bool, 
 		in.TextColor(c.Theme().TextMuted)
 	case !o.secrets:
 		// Variables' values aren't expanded, so they show no references.
-		a.highlightVars(c, in, kv.Value)
+		a.highlightVars(c, in, kv.Value, label, 12)
 	}
 	if !o.secrets && a.suggestVars(c, in, &kv.Value, label) {
 		changed = true

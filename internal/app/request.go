@@ -125,7 +125,8 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		url := ui.TextInput(c, &r.URL).Grow(1).MinWidth(0).Font(mono).FontFeatures(monoFeatures).
 			Placeholder("{{base}}/users").Label("URL").Bind(&a.urlHandle).
 			OnPaste(func(text string) bool { return a.pasteCurl(tb, text) })
-		if a.highlightVars(c, url, r.URL) {
+		// The card of the variable pointed at says more than the URL.
+		if a.highlightVars(c, url, r.URL, "URL", t.FontSize) && a.tip.label != "URL" {
 			url.Tooltip(a.env.Expand(r.URL, nil))
 		}
 		if a.suggestVars(c, url, &r.URL, "URL") || url.Changed() {

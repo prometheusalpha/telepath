@@ -46,6 +46,7 @@ type app struct {
 	suggested  string // the input a variable was put in between frames
 	caretLabel string // the input whose caret goes to caretAt next frame
 	caretAt    int
+	tip        varTip // the variable the pointer is over, with its value
 
 	searchOpen bool
 	query      string
