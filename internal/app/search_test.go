@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -24,6 +25,42 @@ func TestFuzzyRanks(t *testing.T) {
 	}
 	if _, ok := fuzzy("ÜS", "über user"); !ok {
 		t.Error("case and non-ASCII")
+	}
+	for _, q := range []string{"hoá đơn", "hóa đơn", "hoa don", "HOÁ ĐƠN"} {
+		if _, ok := fuzzy(q, "Hóa đơn mua vào"); !ok {
+			t.Errorf("%q misses Hóa đơn", q)
+		}
+	}
+	if _, ok := fuzzy("hóa", "Ho\u0301a đơn"); !ok { // decomposed, as macOS file names are
+		t.Error("NFD name")
+	}
+	same, _ := fuzzy("hóa", "hóa đơn")
+	other, _ := fuzzy("hóa", "hòa đơn")
+	if same <= other {
+		t.Errorf("hóa đơn %d, hòa đơn %d", same, other)
+	}
+	// The h of "danh" must not take the match of "hóa" away from its word.
+	word, _ := fuzzy("hoá", "Danh sách hóa đơn")
+	strewn, _ := fuzzy("hoá", "api-dev.tendoo.vn/warehouse/api")
+	if word <= strewn {
+		t.Errorf("Danh sách hóa đơn %d, warehouse URL %d", word, strewn)
+	}
+}
+
+func TestMatchNodeRanks(t *testing.T) {
+	words := strings.Fields("hoá đơn")
+	score := func(name, crumbs string) int {
+		sc, ok := matchNode(words, model.NewRequest(name), crumbs, "")
+		if !ok {
+			t.Fatalf("%q in %q does not match", name, crumbs)
+		}
+		return sc
+	}
+	named := score("Danh sách hóa đơn đầu vào", "E - Invoice")
+	inFolder := score("Update config", "E - Invoice / Hóa đơn mua vào")
+	strewn := score("api-dev.tendoo.vn/warehouse/api/v1/po/create-stocktake Copy", "Warehouse / stocktake")
+	if named <= inFolder || inFolder <= strewn {
+		t.Errorf("named %d, in folder %d, strewn %d", named, inFolder, strewn)
 	}
 }
 

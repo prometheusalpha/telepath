@@ -100,7 +100,8 @@ go vet ./... && go test ./...
 ### Search (⌘K)
 - `SearchField` không cho `OnTextKey` chạm tới ô nhập bên trong, nên ↑/↓ chỉ di chuyển con trỏ chữ. Modal search dùng `TextInputBase` + `Search()` + icon tự vẽ. Enter là `Submitted()` của ô nhập, `OnTextKey` không thấy được phím này.
 - `OnTextKey` có thể chạy giữa hai frame: nó đọc `a.hits` của frame trước, đừng tính lại kết quả bên trong đó.
-- `fuzzy` chấm điểm: ký tự liền nhau, đầu từ và đầu chuỗi được cộng thêm. Mỗi từ trong query phải khớp với tên (nhân 3), method (nhân 2), hoặc folder/URL (nhân 1). URL được thử cả bản gốc lẫn bản đã thay biến (`a.env.Expand`), nên gõ host vẫn khớp `{{base}}`; còn kết quả thì hiện URL gốc. Muốn chỉnh xếp hạng thì thêm case vào `TestFuzzyRanks`.
+- `fuzzy` xếp theo kiểu khớp trước (giống quick open của `../dbx`): exact > chữ đầu các từ (`gu` → get user) > prefix > đầu các từ (`wordPrefixes`) > chuỗi con > rải rác (lấy đoạn chặt nhất, không lấy ký tự khớp đầu tiên). Cùng kiểu thì khớp chặt hơn được điểm cao hơn. Mỗi từ trong query phải khớp với tên (+400), method (+200), hoặc folder/URL (+0); kiểu khớp nặng hơn chỗ khớp, nên "hóa" nguyên vẹn ở tên folder thắng h‑o‑a rải rác trong tên request là một URL dài. Tên chứa nguyên cả câu query thì được thêm 10000. URL được thử cả bản gốc lẫn bản đã thay biến (`a.env.Expand`), nên gõ host vẫn khớp `{{base}}`; còn kết quả thì hiện URL gốc. Muốn chỉnh xếp hạng thì thêm case vào `TestFuzzyRanks`.
+- `fuzzy` so theo chữ gốc, bỏ dấu (`fold`: NFD lấy rune đầu, `đ` → `d`), vì tiếng Việt đặt dấu thanh ở hai kiểu ("hoá"/"hóa") và người dùng hay gõ không dấu; khớp đúng cả dấu thì được cộng 1 điểm. Ký tự không phải chữ/số được coi như dấu cách, nên "get list" khớp `get-list`.
 - `tree.parent` (dựng trong `reindex`) dùng cho breadcrumb và `reveal` (mở các folder cha rồi chọn node ở sidebar). `a.recent` chỉ nằm trong bộ nhớ, tối đa 10 mục.
 
 ### Import / export

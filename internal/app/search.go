@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/egoist/mygo/ui"
+	"golang.org/x/text/unicode/norm"
 
 	"telepath/internal/model"
 )
@@ -19,63 +20,240 @@ type hit struct {
 	score  int
 }
 
-// fuzzy scores how well q's runes appear in order in s, case aside: runes
-// next to each other and at the start of words count more, so "gu" ranks
-// "get user" above "logout".
+// fuzzy scores how well q matches s, by the kind of match first, as dbx's
+// quick open does: exact, the initials of s's words ("gu" for "get user"),
+// a prefix, prefixes of its words, a substring, then q's runes scattered
+// in order. Within a kind, a tighter match scores more. Case and marks
+// aside: Vietnamese puts the tone on either vowel ("hoá", "hóa"), and
+// people type it without any, so runes match by their base letter and
+// score a point more when all the marks agree.
 func fuzzy(q, s string) (int, bool) {
-	q, s = strings.ToLower(q), strings.ToLower(s)
-	score, run, si := 0, 0, 0
-	prev := ' '
-	for _, qr := range q {
-		found := false
-		for si < len(s) {
-			r, n := utf8.DecodeRuneInString(s[si:])
-			si += n
-			if r == qr {
-				score += 1 + run*4
-				if !unicode.IsLetter(prev) && !unicode.IsDigit(prev) {
-					score += 6
-				}
-				if si == n {
-					score += 4 // the very start: "user log" over "ban user"
-				}
-				run++
-				prev, found = r, true
-				break
-			}
-			run, prev = 0, r
-		}
-		if !found {
-			return 0, false
+	qt, st := prep(q), prep(s)
+	if len(qt.fold) == 0 {
+		return 0, false
+	}
+	kind, tight, at := match(qt.fold, st)
+	if kind == 0 {
+		return 0, false
+	}
+	agree := 1
+	for i, p := range at {
+		if qt.orig[i] != st.orig[p] {
+			agree = 0
+			break
 		}
 	}
-	return score, true
+	return kind*1000 + tight*2 + agree, true
+}
+
+// text is a string ready to match: its runes in lower case, as they are
+// and folded (what is not a letter or digit to a space), and its words, split at what is not a letter or digit and
+// at camelCase.
+type text struct {
+	orig, fold []rune
+	words      [][2]int // start, end
+}
+
+func prep(s string) text {
+	var t text
+	prev := ' '
+	start := -1
+	for _, r := range norm.NFC.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		i := len(t.orig)
+		sep := !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		if start >= 0 && (sep || unicode.IsLower(prev) && unicode.IsUpper(r)) {
+			t.words = append(t.words, [2]int{start, i})
+			start = -1
+		}
+		if start < 0 && !sep {
+			start = i
+		}
+		lr := unicode.ToLower(r)
+		t.orig = append(t.orig, lr)
+		if sep {
+			// "get list" is "get-list" and "get_list" too.
+			t.fold = append(t.fold, ' ')
+		} else {
+			t.fold = append(t.fold, fold(lr))
+		}
+		prev = r
+	}
+	if start >= 0 {
+		t.words = append(t.words, [2]int{start, len(t.orig)})
+	}
+	return t
+}
+
+// match returns the kind of match of q in s (0 for none, 6 for exact),
+// how tight it is within that kind (0 to 99) and where q's runes are.
+func match(q []rune, s text) (kind, tight int, at []int) {
+	n, m := len(s.fold), len(q)
+	if m > n {
+		return 0, 0, nil
+	}
+	loose := func(d int) int { return 99 - min(d, 99) }
+	run := func(from int) []int {
+		at := make([]int, m)
+		for i := range at {
+			at[i] = from + i
+		}
+		return at
+	}
+	if slices.Equal(q, s.fold) {
+		return 6, 99, run(0)
+	}
+	if len(s.words) >= 2 && len(s.words) == m {
+		at := make([]int, m)
+		for i, w := range s.words {
+			if s.fold[w[0]] != q[i] {
+				at = nil
+				break
+			}
+			at[i] = w[0]
+		}
+		if at != nil {
+			return 5, loose(m), at
+		}
+	}
+	if slices.Equal(q, s.fold[:m]) {
+		return 4, loose(n - m), run(0)
+	}
+	if at, gap := wordPrefixes(q, s); at != nil {
+		return 3, loose(gap), at
+	}
+	for i := 0; i+m <= n; i++ {
+		if slices.Equal(q, s.fold[i:i+m]) {
+			return 2, loose(i), run(i)
+		}
+	}
+	// The tightest run of q's runes in order: taking the first rune that
+	// fits misses "hóa" in "danh sách hóa", as its h is in "danh".
+	best, span := []int(nil), 0
+	for i := range n {
+		if s.fold[i] != q[0] {
+			continue
+		}
+		at := []int{i}
+		for j := i + 1; j < n && len(at) < m; j++ {
+			if s.fold[j] == q[len(at)] {
+				at = append(at, j)
+			}
+		}
+		if len(at) < m {
+			break // no later start fits either
+		}
+		if sp := at[m-1] - i + 1; best == nil || sp < span {
+			best, span = at, sp
+		}
+	}
+	if best != nil {
+		return 1, loose(span - m), best
+	}
+	return 0, 0, nil
+}
+
+// wordPrefixes matches q as prefixes of s's words in order, "usli" in
+// "user list", one word at least, and returns where q's runes are and how
+// far apart the words are: the words skipped between them count most.
+func wordPrefixes(q []rune, s text) (at []int, gap int) {
+	type state struct {
+		first, last, used int
+		at                []int
+	}
+	cost := func(st *state) int { return (st.last-st.first-st.used+1)*10 + st.used }
+	m, nw := len(q), len(s.words)
+	// states[qi][used] is the best way to match q[:qi] in used words.
+	states := make([][]*state, m+1)
+	for i := range states {
+		states[i] = make([]*state, nw+1)
+	}
+	states[0][0] = &state{first: -1, last: -1}
+	for k, w := range s.words {
+		// Down from the end, so a state made from word k is not grown by
+		// word k again.
+		for qi := m - 1; qi >= 0; qi-- {
+			for used := min(k, nw-1); used >= 0; used-- {
+				st := states[qi][used]
+				if st == nil {
+					continue
+				}
+				for l := 1; l <= min(w[1]-w[0], m-qi); l++ {
+					if s.fold[w[0]+l-1] != q[qi+l-1] {
+						break
+					}
+					c := &state{first: st.first, last: k, used: used + 1, at: slices.Clone(st.at)}
+					if used == 0 {
+						c.first = k
+					}
+					for i := range l {
+						c.at = append(c.at, w[0]+i)
+					}
+					if old := states[qi+l][used+1]; old == nil || cost(c) < cost(old) {
+						states[qi+l][used+1] = c
+					}
+				}
+			}
+		}
+	}
+	var best *state
+	for _, st := range states[m][1:] {
+		if st != nil && (best == nil || cost(st) < cost(best)) {
+			best = st
+		}
+	}
+	if best == nil {
+		return nil, 0
+	}
+	return best.at, cost(best)
+}
+
+// fold is r without its marks: "ố" is "o". đ is a letter of its own, not
+// d with a mark, so it is folded by hand.
+func fold(r rune) rune {
+	if r < utf8.RuneSelf {
+		return r
+	}
+	if r == 'đ' {
+		return 'd'
+	}
+	b, _ := utf8.DecodeRuneInString(norm.NFD.String(string(r)))
+	return b
 }
 
 // matchNode scores a node for a query of words, each of which must match
 // its name, its folders or its method and URL, as typed or with its
-// variables filled in (url), so a host matches {{base}}; the name weighs
-// most.
+// variables filled in (url), so a host matches {{base}}. The kind of match
+// counts before where it is, so "hóa" whole in a folder's name beats its
+// letters strewn over a request named for a long URL; for one kind, the
+// name weighs most. A name holding the whole query beats them all.
 func matchNode(words []string, n *model.Node, crumbs, url string) (int, bool) {
 	total := 0
 	for _, w := range words {
 		best, ok := 0, false
 		try := func(s string, weight int) {
-			if sc, hit := fuzzy(w, s); hit && sc*weight > best {
-				best, ok = sc*weight, true
+			if sc, hit := fuzzy(w, s); hit && sc+weight > best {
+				best, ok = sc+weight, true
 			}
 		}
-		try(n.Name, 3)
-		try(crumbs, 1)
+		try(n.Name, 400)
+		try(crumbs, 0)
 		if n.Request != nil {
-			try(n.Request.Method, 2)
-			try(n.Request.URL, 1)
-			try(url, 1)
+			try(n.Request.Method, 200)
+			try(n.Request.URL, 0)
+			try(url, 0)
 		}
 		if !ok {
 			return 0, false
 		}
 		total += best
+	}
+	if len(words) > 1 {
+		if sc, ok := fuzzy(strings.Join(words, " "), n.Name); ok && sc >= 2000 {
+			total += 10000
+		}
 	}
 	return total, true
 }
