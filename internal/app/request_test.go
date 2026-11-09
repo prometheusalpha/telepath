@@ -176,3 +176,32 @@ func TestResponseOnTheRight(t *testing.T) {
 		t.Errorf("session %+v", s)
 	}
 }
+
+func TestLongHeaderValueWraps(t *testing.T) {
+	long := "https://a.nel.cloudflare.com/report/v4?s=" + strings.Repeat("DcJd9Aiu8C5QsKODUsq7w4gu", 12)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Report-To", long)
+	}))
+	defer srv.Close()
+	a, _, updates := sendingApp(srv.URL)
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("ping")
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyEnter)
+	tt.Frame()
+	(<-updates)()
+	tt.Frame()
+	if err := tt.Click("Headers 3"); err != nil {
+		t.Fatalf("%v, texts %q", err, tt.Texts())
+	}
+	tt.Frame()
+	r, ok := tt.Find(long)
+	if !ok {
+		t.Fatalf("no value, texts %q", tt.Texts())
+	}
+	// Broken only at the "?", the value is two lines, the second running
+	// past the table; broken in the token too, it is more.
+	if r.H < 40 {
+		t.Errorf("value %+v is not wrapped in its token", r)
+	}
+}

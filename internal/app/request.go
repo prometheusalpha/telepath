@@ -389,7 +389,10 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 			if col == 0 {
 				ui.Text(c, h.Key).Font(mono).FontFeatures(monoFeatures).FontSize(12).SingleLine()
 			} else {
-				ui.Text(c, h.Value).Font(mono).FontFeatures(monoFeatures).FontSize(12).Selectable()
+				// Shrinks below its longest word, which breaks: a cookie or a
+				// token has no place to break, and would widen the column past
+				// the table.
+				ui.Text(c, h.Value).Font(mono).FontFeatures(monoFeatures).FontSize(12).Selectable().Shrink(1).MinWidth(0)
 			}
 		}).Grow(1)
 	}
