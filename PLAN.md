@@ -198,7 +198,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - Kéo thả trong sidebar để sắp xếp / chuyển folder (`Draggable`/drag-and-drop).
 - Khôi phục tab đang mở + tab active + kích thước split khi mở lại app.
-- Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌘L focus URL.
+- Phím tắt: ⌘N request mới, ⌘⇧N folder mới, ⌘1…9 chuyển tab, ⌃⇥/⌃⇧⇥ tab sau/trước (vòng tròn), ⌘L focus URL.
 - Response: nút copy body, lưu body ra file, cảnh báo/ cắt hiển thị khi response quá lớn.
 - Chọn vị trí khu response: bên dưới (như hiện tại) hoặc bên phải request (chia trái/phải). Có nút đổi nhanh trên thanh response + mục trong menu View, lưu lựa chọn; mỗi vị trí nhớ kích thước split riêng.
 - Gợi ý biến khi gõ `{{` trong ô URL và các ô của bảng (Params, Path, Headers, Body form, Auth): hiện danh sách biến kèm giá trị (che biến secret), lọc theo chữ đang gõ, Enter/Tab chèn `{{name}}`.
@@ -219,7 +219,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - Paste lệnh `curl …` vào ô URL: ghi đè request đang mở (method, URL, query, header, body, auth), giữ tên và vị trí; lệnh đọc không được thì báo toast, text khác paste như thường.
 - ⇧⌘W là Close Other Tabs; Close Window không có phím tắt.
-- Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
+- Settings chia tab General / Shortcuts. Đổi được phím của các lệnh trong menu File, Show Next/Previous Tab (menu View), Settings…, Focus URL, Send (⌘1…⌘9 và phím trong sidebar giữ cố định). Bấm vào ô phím rồi gõ tổ hợp mới; ⌫ bỏ phím, Esc huỷ. Phải có ⌘ hoặc ⌃ (trừ F1–F12); phím của macOS (⌘Q, ⌘C…) và ⌘1…⌘9 bị từ chối. Gán phím đang thuộc lệnh khác thì lệnh kia mất phím, có dòng báo. Nút reset từng dòng và Restore Defaults. Lưu trong workspace, chỉ phần khác mặc định.
 - Rê chuột lên `{{name}}` trong URL, Params, Path, Headers, Form: card hiện tên, giá trị (secret thì che) và nút copy giá trị; biến chưa có thì báo. Card ở nguyên khi chuột đi xuống nó.
 - Ô key của Headers: gợi ý tên header và gợi ý biến gộp vào một danh sách, biến đứng trước.
 - Auth: nút copy cạnh từng ô, chép giá trị đã thay biến.
@@ -230,7 +230,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
   - 11.3.2. Chạy filter trong goroutine, có debounce, kết quả về qua `a.update` và so `seq`. Cây đã parse giữ trong tab, dùng lại; kết quả hiện ở editor riêng, không đè `tb.body`. Biểu thức singular thì hiện giá trị trần, còn lại là mảng. Gửi lại request thì filter vẫn giữ và áp lên response mới. Body > 2 MB vẫn filter được.
   - 11.3.3. Ô filter mono dưới thanh Body (chỉ khi response là JSON), số match bên phải, lỗi hiện một dòng đỏ và giữ kết quả đúng gần nhất, không match thì "No match", Esc hoặc nút × trong ô để xoá. Biểu thức chỉ nằm trong tab, không lưu. Copy body chép kết quả đang thấy; Save body vẫn ghi body gốc. Không có phím tắt riêng.
   - 11.3.4. Test bằng `ui.NewTester` (gõ filter, lỗi, Esc, gửi lại), `-race`; cập nhật Gotchas trong `CLAUDE.md`.
-- 11.4 README.md
+- 11.4 README.md (xong)
 - 11.5. Preview response, giải nén và đọc đúng charset (xong)
   - 11.5.1. Tab của response tuỳ theo body: text có `Body | Headers`, HTML/SVG thêm `Preview`, ảnh và PDF chỉ có `Preview | Headers`. Không có tab Raw: Body của HTML không bị format, nên đã có Body và Preview là đủ. HTML/XML trong Body được tô màu.
   - 11.5.2. `Content-Encoding` còn sót (khi request tự đặt `Accept-Encoding`): gzip, deflate (zlib hoặc bare), br, zstd, nhiều lớp. Giải nén tối đa 20 MB. Size vẫn là số byte nhận được, kèm tên encoding. Giải không được thì hiện y nguyên và có dòng báo. Save body ghi body đã giải nén.

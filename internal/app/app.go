@@ -421,6 +421,9 @@ func Run() {
 			}},
 			{Role: mygo.RoleEditMenu},
 			{Label: "View", Submenu: []*mygo.MenuItem{
+				item("next-tab"),
+				item("previous-tab"),
+				mygo.Separator(),
 				{ID: "response-below", Label: "Response Below", Type: mygo.MenuItemRadio, Checked: !a.responseRight,
 					Click: func(*mygo.MenuItem, *mygo.Window) { win.Update(func() { a.setResponseRight(false) }) }},
 				{ID: "response-right", Label: "Response on the Right", Type: mygo.MenuItemRadio, Checked: a.responseRight,
