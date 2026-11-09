@@ -76,6 +76,43 @@ func TestParseCurlAuthHeader(t *testing.T) {
 			t.Errorf("%q: %+v, %+v", v, r.Headers, r.Auth)
 		}
 	}
+	// The first that converts wins; every Authorization header goes.
+	r, _ = ParseCurl(`curl a.dev -H 'Authorization: Digest x=1' -H 'Authorization: Bearer a' -H 'authorization: Bearer b' -H 'X: 1'`)
+	if len(r.Headers) != 1 || r.Auth != (model.Auth{Kind: model.AuthBearer, Token: "a"}) {
+		t.Errorf("several: %+v, %+v", r.Headers, r.Auth)
+	}
+}
+
+func TestPostmanAuthHeader(t *testing.T) {
+	const doc = `{"info": {"name": "A", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "coll"}]},
+  "item": [
+    {"name": "over", "request": {"method": "GET", "url": "a.dev",
+      "header": [{"key": "Authorization", "value": "Basic YWRhOnB3"}, {"key": "authorization", "value": "Bearer x"}]}},
+    {"name": "only", "request": {"method": "GET", "url": "a.dev", "auth": {"type": "noauth"},
+      "header": [{"key": "Authorization", "value": "Bearer {{t}}"}]}},
+    {"name": "off", "request": {"method": "GET", "url": "a.dev",
+      "header": [{"key": "Authorization", "value": "Bearer off", "disabled": true}]}},
+    {"name": "digest", "request": {"method": "GET", "url": "a.dev", "auth": {"type": "noauth"},
+      "header": [{"key": "Authorization", "value": "Digest x=1"}]}}
+  ]}`
+	r, err := Parse([]byte(doc), "a.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := func(i int) *model.Request { return r.Items[i].Request }
+	if h, a := req(0).Headers, req(0).Auth; len(h) != 0 || a != (model.Auth{Kind: model.AuthBasic, Username: "ada", Password: "pw"}) {
+		t.Errorf("the header doesn't win over auth: %+v, %+v", h, a)
+	}
+	if h, a := req(1).Headers, req(1).Auth; len(h) != 0 || a != (model.Auth{Kind: model.AuthBearer, Token: "{{t}}"}) {
+		t.Errorf("header only: %+v, %+v", h, a)
+	}
+	if h, a := req(2).Headers, req(2).Auth; len(h) != 1 || a.Token != "coll" {
+		t.Errorf("a disabled header: %+v, %+v", h, a)
+	}
+	if h, a := req(3).Headers, req(3).Auth; len(h) != 1 || a.Kind != model.AuthNone {
+		t.Errorf("digest: %+v, %+v", h, a)
+	}
 }
 
 func TestCurlRoundTrip(t *testing.T) {

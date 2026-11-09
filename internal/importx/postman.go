@@ -207,6 +207,7 @@ func (p *pmParser) request(pr *pmRequest, inherited *pmAuth) *model.Request {
 		auth = inherited
 	}
 	r.Auth = p.auth(auth)
+	authFromHeader(r)
 	return r
 }
 

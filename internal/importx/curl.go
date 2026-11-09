@@ -209,32 +209,39 @@ func ParseCurl(cmd string) (*model.Request, error) {
 	return r, nil
 }
 
-// authFromHeader moves a Basic or Bearer Authorization header into Auth.
-// The header wins over -u, as it does in curl. Other schemes, or Basic
-// that doesn't decode to user:password, stay as headers.
+// authFromHeader moves a Basic or Bearer Authorization header into Auth,
+// over any Auth already there: the header is what curl or Postman sends.
+// The first that converts wins and every other enabled Authorization
+// header goes with it. Other schemes, Basic that doesn't decode to
+// user:password, and disabled headers stay as headers.
 func authFromHeader(r *model.Request) {
-	i := slices.IndexFunc(r.Headers, func(h model.KV) bool { return strings.EqualFold(h.Key, "Authorization") })
-	if i < 0 {
-		return
+	isAuth := func(h model.KV) bool { return h.Enabled && strings.EqualFold(h.Key, "Authorization") }
+	for _, h := range r.Headers {
+		if !isAuth(h) {
+			continue
+		}
+		if a, ok := authOf(h.Value); ok {
+			r.Auth = a
+			r.Headers = slices.DeleteFunc(r.Headers, isAuth)
+			return
+		}
 	}
-	scheme, cred, _ := strings.Cut(r.Headers[i].Value, " ")
+}
+
+func authOf(value string) (model.Auth, bool) {
+	scheme, cred, _ := strings.Cut(value, " ")
 	cred = strings.TrimSpace(cred)
 	switch {
 	case cred == "":
-		return
 	case strings.EqualFold(scheme, "Bearer"):
-		r.Auth = model.Auth{Kind: model.AuthBearer, Token: cred}
+		return model.Auth{Kind: model.AuthBearer, Token: cred}, true
 	case strings.EqualFold(scheme, "Basic"):
 		b, err := base64.StdEncoding.DecodeString(cred)
-		u, p, ok := strings.Cut(string(b), ":")
-		if err != nil || !ok {
-			return
+		if u, p, ok := strings.Cut(string(b), ":"); err == nil && ok {
+			return model.Auth{Kind: model.AuthBasic, Username: u, Password: p}, true
 		}
-		r.Auth = model.Auth{Kind: model.AuthBasic, Username: u, Password: p}
-	default:
-		return
 	}
-	r.Headers = slices.Delete(r.Headers, i, i+1)
+	return model.Auth{}, false
 }
 
 func header(hs []model.KV, key string) string {
