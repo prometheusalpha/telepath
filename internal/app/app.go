@@ -113,6 +113,11 @@ type app struct {
 	// Both call back on the main thread, and not at all when canceled.
 	openFile func(done func(name string, data []byte))
 	saveFile func(name string, data []byte, done func(error))
+	// newWebView makes a web view for a response's preview; nil in tests,
+	// which have no window to make one in.
+	newWebView func() (*mygo.WebView, error)
+	// openExternal opens a URL in the default browser; nil in tests.
+	openExternal func(url string)
 
 	sidebarWidth float32
 }
@@ -453,6 +458,10 @@ func Run() {
 			menu.ItemByID("response-below").SetChecked(!right)
 			menu.ItemByID("response-right").SetChecked(right)
 		}
+		// Before the window, which handles the schemes there are then.
+		if err := mygo.Protocol.HandleFunc(previewScheme, servePreview); err != nil {
+			log.Print(err)
+		}
 		// Before the window shows, so it opens in the saved appearance.
 		mygo.Theme.SetSource(themeSource(ws.Theme))
 		win = mygo.NewWindow(mygo.WindowOptions{
@@ -468,6 +477,14 @@ func Run() {
 			Content:        ui.View(a.view),
 		})
 		a.update = win.Update
+		a.openExternal = func(u string) {
+			if err := mygo.Shell.OpenExternal(u); err != nil {
+				log.Print(err)
+			}
+		}
+		a.newWebView = func() (*mygo.WebView, error) {
+			return win.NewWebView(mygo.WebViewOptions{Page: mygo.PageOptions{Untrusted: true}})
+		}
 		jsonFiles := []mygo.FileFilter{{Name: "Collections", Extensions: []string{"json"}}}
 		a.openFile = func(done func(string, []byte)) {
 			go func() {

@@ -37,30 +37,20 @@ type Response struct {
 	Duration   time.Duration
 	Size       int64 // bytes of body received, before truncating
 	URL        string
+	// Encoding is the Content-Encoding the body was decoded from, which
+	// the transport leaves when the request asked for its own codings;
+	// EncodingErr is why it couldn't be, and Body is then as received.
+	Encoding    string
+	EncodingErr error
 }
 
 // JSON reports whether the body is JSON, by its type or, for servers that
 // send text/plain, by parsing.
 func (r *Response) JSON() bool {
-	for _, h := range r.Headers {
-		if strings.EqualFold(h.Key, "Content-Type") {
-			if mt, _, _ := mime.ParseMediaType(h.Value); mt == "application/json" || strings.HasSuffix(mt, "+json") {
-				return true
-			}
-		}
+	if mt, _, _ := mime.ParseMediaType(r.Header("Content-Type")); mt == "application/json" || strings.HasSuffix(mt, "+json") {
+		return true
 	}
 	return json.Valid(bytes.TrimSpace(r.Body)) && len(bytes.TrimSpace(r.Body)) > 0
-}
-
-// Pretty returns the body indented when it is JSON, else as it came.
-func (r *Response) Pretty() string {
-	if r.JSON() {
-		var out bytes.Buffer
-		if json.Indent(&out, r.Body, "", "  ") == nil {
-			return out.String()
-		}
-	}
-	return string(r.Body)
 }
 
 // NormalizeURL adds http:// to a URL typed without a scheme, as
@@ -266,6 +256,13 @@ func Send(ctx context.Context, client *http.Client, r *model.Request) (*Response
 	}
 	if len(body) > MaxBody {
 		body, out.Truncated = body[:MaxBody], true
+	}
+	if ce := resp.Header.Get("Content-Encoding"); ce != "" {
+		var cut bool
+		if body, cut, out.EncodingErr = decodeContent(body, ce); out.EncodingErr == nil {
+			out.Encoding = ce
+			out.Truncated = out.Truncated || cut
+		}
 	}
 	out.Body = body
 	for k, vs := range resp.Header {

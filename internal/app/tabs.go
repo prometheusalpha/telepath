@@ -33,6 +33,7 @@ func (a *app) closeTab(i int) {
 		return
 	}
 	a.tabs[i].stop()
+	a.tabs[i].preview.release()
 	a.tabs = slices.Delete(a.tabs, i, i+1)
 	a.touch()
 	if a.active >= i && a.active > 0 {
@@ -117,6 +118,7 @@ func (a *app) closeOthers(i int) {
 	for j := len(a.tabs) - 1; j >= 0; j-- {
 		if j != i {
 			a.tabs[j].stop()
+			a.tabs[j].preview.release()
 		}
 	}
 	a.tabs = []*tab{a.tabs[i]}

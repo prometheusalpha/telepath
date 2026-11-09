@@ -26,8 +26,8 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/jsonpath`: JSONPath theo RFC 9535 (không có hàm `length()`/`match()`…), dùng cho ô filter của response. `Value` riêng giữ thứ tự key và chữ của số.
-- `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON.
-- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `settings.go`, `shortcuts.go`, `jwt.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
+- `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON. `decode.go`: giải `Content-Encoding`, nhận diện và giải charset, phân loại body (HTML/binary/previewable).
+- `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `preview.go`, `settings.go`, `shortcuts.go`, `jwt.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
 - Root chỉ có `main.go` gọi `app.Run()`; code mới không để ở root.
 
 ## Gotchas
@@ -73,6 +73,17 @@ go vet ./... && go test ./...
 - Content-Type người dùng tự đặt luôn thắng, kể cả với multipart (dù như vậy là mất boundary).
 - `mygo.Dialog.Open` chờ người dùng chọn xong mới trả về, nên phải gọi trong goroutine rồi trả kết quả qua `win.Update` (`a.pickFile`). Callback ghi đường dẫn vào dòng theo vị trí và chỉ ghi nếu key ở đó chưa đổi, vì trong lúc dialog mở các dòng có thể đã bị thêm hoặc xoá.
 - Body JSON/Text: buffer của editor (`tab.bodyEdit`) là nguồn chính; mỗi frame so `Buffer.String()` với `Body.Text` rồi chép sang. Chỉ gọi `SetLanguage` khi đổi kiểu body.
+
+### Preview và encoding của response
+- Tab của response được tính mỗi frame từ body (`responseViews`), nên tab đang chọn lưu theo tên (`tb.respView`), không theo vị trí.
+- `http.Transport` chỉ tự giải gzip khi chính nó thêm `Accept-Encoding`. Người dùng tự đặt header đó thì `Content-Encoding` còn nguyên, và `httpx.Send` tự giải (`decodeContent`). `Body` là bản đã giải, `Size` là số byte nhận được.
+- `Response.Charset` dựa trên `charset.DetermineEncoding`, nhưng hàm này chỉ đọc 1 KB đầu và trả `windows-1252` khi không thấy byte nào ngoài ASCII. Vì vậy nếu kết quả không chắc chắn mà cả body là UTF-8 hợp lệ thì coi là UTF-8. `<meta charset>` chỉ được xét với HTML; JSON luôn là UTF-8. `iso-8859-1` không có trong `Charsets`, vì theo WHATWG nó chính là `windows-1252`.
+- Đọc body (`readResponse`: giải charset, format) chạy trong goroutine, cả khi gửi request lẫn khi đổi charset (`readAs`). `readAs` tăng `tb.seq` như lúc gửi. Filter JSON vẫn đọc `resp.Body` (UTF-8).
+- Preview: mỗi tab một `mygo.WebView` (`PageOptions.Untrusted`), tạo lần đầu khi hiện và `release` khi đóng tab. Tạo qua `a.newWebView`; trong test hook này là nil, view hiện "No preview".
+- HTML được load bằng `LoadHTML(noScripts(text), resp.URL)`: `text` lấy từ `tb.body`, vì Body của HTML chỉ tô màu chứ không format; chữ đã giải charset, và CSP meta được chèn sau doctype (chèn trước doctype thì trang vào quirks mode). Base là URL của response, nên link tương đối vẫn load được. Không dùng scheme riêng cho HTML, vì `<base>` tự chèn sẽ thắng `<base>` của chính trang.
+- Ảnh, SVG và PDF được phục vụ qua `telepath-preview://preview/<n>` (`previewDocs`, đọc từ goroutine của handler). Scheme phải được đăng ký trước khi tạo cửa sổ. SVG có header CSP; PDF thì không, vì CSP chặn luôn trình xem PDF.
+- `OnWillNavigate` chỉ nhận navigation do trang tự gây ra (`LoadHTML`/`LoadURL` là `Unasked`, không đi qua đây). Trang chỉ được nhảy tới anchor trong chính nó. Link do người dùng bấm (`UserInitiated`, scheme `http`/`https`/`mailto`) được mở bằng trình duyệt mặc định (`a.openExternal`); form, meta refresh và các scheme khác (`file:`…) đều bị chặn.
+- `mygo.json` có `NSAllowsArbitraryLoadsInWebContent` (ATS), để Preview load được CSS/ảnh qua `http://` từ host khác localhost. Khoá này chỉ áp dụng cho WebView; request của app đi qua Go nên không bị ATS chặn.
 
 ### Auth
 - `model.Auth` giữ field của mọi kiểu auth, đổi kiểu qua lại không mất chữ đã gõ; lúc gửi (`httpx.applyAuth`) chỉ dùng field của kiểu đang chọn. Header/query cùng tên mà người dùng tự đặt thì thắng.

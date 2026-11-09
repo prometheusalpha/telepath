@@ -24,9 +24,11 @@ var methods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS
 // tab is an open request: what the workspace doesn't keep, as the last
 // response, which lives only while the tab does.
 type tab struct {
-	id      string
-	reqTab  int
-	respTab int
+	id     string
+	reqTab int
+	// respView is the response's tab shown, by its label, as the tabs
+	// there are depend on the body.
+	respView string
 
 	// drafts are the blank rows of the tables, by table.
 	drafts   map[string]*model.KV
@@ -38,12 +40,19 @@ type tab struct {
 	cancel  context.CancelFunc
 	// seq tells a response apart from those of sends canceled or replaced
 	// since, which may still arrive.
-	seq    int
-	resp   *httpx.Response
-	err    error
-	body   *editor.State
-	json   bool // the body is JSON, found off the main thread
-	filter filter
+	seq  int
+	resp *httpx.Response
+	err  error
+	body *editor.State
+	json bool // the body is JSON, found off the main thread
+	// charset is the one chosen to read the body in, "" for the one the
+	// response says; decodedAs is what body was read as, and
+	// decodeErr why that failed, in which case it's as received.
+	charset   string
+	decodedAs string
+	decodeErr error
+	preview   preview
+	filter    filter
 	// missing are the variables the last send found no value for, which
 	// went as typed.
 	missing []string
@@ -73,28 +82,88 @@ func (a *app) send(tb *tab) {
 	client := a.client
 	go func() {
 		resp, err := httpx.Send(ctx, client, req)
-		// Formatted here, off the main thread; a large body shows as it
-		// came, as indenting and highlighting it would stall the window.
-		var text string
-		big := resp != nil && len(resp.Body) > bigBody
-		isJSON := resp != nil && resp.JSON()
-		if resp != nil && !big {
-			text = resp.Pretty()
-		} else if resp != nil {
-			text = string(resp.Body)
+		var b readBody
+		if resp != nil {
+			b = readResponse(resp, "")
 		}
 		a.update(func() {
 			if tb.seq != seq {
 				return
 			}
 			tb.sending, tb.cancel = false, nil
-			tb.resp, tb.err, tb.json = resp, err, isJSON
+			tb.resp, tb.err, tb.charset = resp, err, ""
 			if resp != nil {
-				buf := editor.NewBuffer(text)
-				if !big && isJSON {
-					buf.SetLanguage(editor.LanguageNamed("JSON"))
-				}
-				tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !big}
+				tb.show(b)
+			}
+		})
+	}()
+}
+
+// readBody is a response's body as the panel shows it, made off the main
+// thread.
+type readBody struct {
+	text      string
+	language  string
+	json, big bool
+	charset   string
+	err       error
+}
+
+// readResponse reads the body in charset, or the one the response says
+// when that's "", and formats it. A large body shows as it came, as
+// indenting and highlighting it would stall the window.
+func readResponse(resp *httpx.Response, charset string) readBody {
+	b := readBody{big: len(resp.Body) > bigBody, json: resp.JSON()}
+	switch {
+	case resp.Binary() && resp.Previewable():
+		// Shown in the preview alone, which reads the bytes.
+		return b
+	case resp.Binary():
+		b.text = string(resp.Body)
+		return b
+	}
+	if charset == "" {
+		charset = resp.Charset()
+	}
+	b.charset = charset
+	b.text, b.err = httpx.Decode(resp.Body, charset)
+	if b.big {
+		return b
+	}
+	b.text = httpx.PrettyText(b.text, b.json)
+	mt := resp.MediaType()
+	switch {
+	case b.json:
+		b.language = "JSON"
+	case resp.HTML():
+		b.language = "HTML"
+	case strings.HasSuffix(mt, "/xml") || strings.HasSuffix(mt, "+xml"):
+		b.language = "XML"
+	}
+	return b
+}
+
+// show puts what readResponse read in the tab's editors.
+func (tb *tab) show(b readBody) {
+	tb.json, tb.decodedAs, tb.decodeErr = b.json, b.charset, b.err
+	buf := editor.NewBuffer(b.text)
+	if b.language != "" {
+		buf.SetLanguage(editor.LanguageNamed(b.language))
+	}
+	tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !b.big}
+}
+
+// readAs reads the body again in charset, "" for the one the response
+// says; until it's read, the body shows as it was.
+func (a *app) readAs(tb *tab, charset string) {
+	tb.charset = charset
+	tb.seq++ // a reading chosen before this one is dropped
+	seq, resp := tb.seq, tb.resp
+	go func() {
+		b := readResponse(resp, charset)
+		a.update(func() {
+			if tb.seq == seq {
+				tb.show(b)
 			}
 		})
 	}()
@@ -237,10 +306,15 @@ func statusColor(t *ui.Theme, code int) ui.Color {
 func (a *app) responseBody(c *ui.Context, tb *tab) {
 	t := c.Theme()
 	resp := tb.resp
+	views := responseViews(resp)
+	at := max(slices.Index(views, tb.respView), 0)
 	ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(6, 12).Shrink(0).Children(func() {
 		ui.Text(c, resp.Status).Font(mono).FontFeatures(monoFeatures).FontWeight(700).FontSize(12).TextColor(statusColor(t, resp.StatusCode))
 		ui.Text(c, httpx.FormatDuration(resp.Duration)).FontSize(12).TextColor(t.TextMuted)
 		size := httpx.FormatSize(resp.Size)
+		if resp.Encoding != "" {
+			size += " " + resp.Encoding
+		}
 		if resp.Truncated {
 			size += " (showing the first " + httpx.FormatSize(httpx.MaxBody) + ")"
 		}
@@ -248,7 +322,10 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		// Where it went, variables and path parameters filled in.
 		ui.Text(c, resp.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
-		if iconButton(c, copyIcon, "Copy body").Clicked() {
+		if tb.decodedAs != "" {
+			a.charsetSelect(c, tb)
+		}
+		if tb.body != nil && iconButton(c, copyIcon, "Copy body").Clicked() {
 			c.Services().WriteClipboard(tb.shown().Buffer.String())
 			c.Toast("Copied the body")
 		}
@@ -261,15 +338,31 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 				}
 			})
 		}
-		countTabs(c, &tb.respTab, tabItem{label: "Body"}, tabItem{"Headers", len(resp.Headers)})
+		items := make([]tabItem, len(views))
+		for i, v := range views {
+			items[i] = tabItem{label: v}
+			if v == "Headers" {
+				items[i].count = len(resp.Headers)
+			}
+		}
+		countTabs(c, &at, items...)
 	})
-	if len(resp.Body) > bigBody {
-		ui.Text(c, "A large body: shown as it came, without formatting.").FontSize(12).
-			TextColor(t.TextMuted).Padding(4, 12).Shrink(0)
+	tb.respView = views[at]
+	note := func(text string, color ui.Color) {
+		ui.Text(c, text).FontSize(12).TextColor(color).Padding(4, 12).Shrink(0)
+	}
+	if resp.EncodingErr != nil {
+		note("Couldn't decode the body ("+resp.EncodingErr.Error()+"): shown as received.", t.Warning)
+	}
+	if tb.decodeErr != nil {
+		note("Couldn't read the body as "+tb.decodedAs+": shown as received.", t.Warning)
+	}
+	if len(resp.Body) > bigBody && tb.respView != "Preview" {
+		note("A large body: shown as it came, without formatting.", t.TextMuted)
 	}
 	ui.Divider(c)
-	switch tb.respTab {
-	case 0:
+	switch tb.respView {
+	case "Body":
 		if len(resp.Body) == 0 {
 			emptyState(c, "Empty body", "")
 			return
@@ -283,7 +376,13 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		}
 		styleCode(c, tb.shown())
 		editor.View(c, tb.shown()).Grow(1).FillWidth().Label("Response body")
-	case 1:
+	case "Preview":
+		if len(resp.Body) == 0 {
+			emptyState(c, "Empty body", "")
+			return
+		}
+		a.previewView(c, tb)
+	case "Headers":
 		cols := []ui.TableColumn{{Title: "Name", Width: 220}, {Title: "Value"}}
 		ui.Table(c, nil, cols, len(resp.Headers), func(row, col int) {
 			h := resp.Headers[row]
@@ -293,6 +392,38 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 				ui.Text(c, h.Value).Font(mono).FontFeatures(monoFeatures).FontSize(12).Selectable()
 			}
 		}).Grow(1)
+	}
+}
+
+// responseViews are the response's tabs: no text of an image or a PDF,
+// and a preview of what a web view shows.
+func responseViews(resp *httpx.Response) []string {
+	var views []string
+	if !resp.Binary() || !resp.Previewable() {
+		views = append(views, "Body")
+	}
+	if resp.Previewable() {
+		views = append(views, "Preview")
+	}
+	return append(views, "Headers")
+}
+
+// charsetSelect reads the body in another charset, for a server that
+// says none, or the wrong one.
+func (a *app) charsetSelect(c *ui.Context, tb *tab) {
+	auto := "Auto"
+	if tb.charset == "" {
+		auto += " (" + tb.decodedAs + ")"
+	}
+	sel := tb.charset
+	if sel == "" {
+		sel = auto
+	}
+	if ui.Select(c, &sel, append([]string{auto}, httpx.Charsets...)).Width(150).FontSize(12).Label("Charset").Changed() {
+		if sel == auto {
+			sel = ""
+		}
+		a.readAs(tb, sel)
 	}
 }
 

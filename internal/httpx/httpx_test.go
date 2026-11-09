@@ -27,8 +27,8 @@ func TestSend(t *testing.T) {
 	if resp.StatusCode != 201 || resp.Status != "201 Created" || !resp.JSON() {
 		t.Errorf("status %q, json %v", resp.Status, resp.JSON())
 	}
-	if want := "{\n  \"method\": \"POST\"\n}"; resp.Pretty() != want {
-		t.Errorf("pretty %q", resp.Pretty())
+	if want := "{\n  \"method\": \"POST\"\n}"; PrettyText(string(resp.Body), true) != want {
+		t.Errorf("pretty %q", resp.Body)
 	}
 }
 
