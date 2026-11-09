@@ -232,9 +232,9 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
   - 11.3.4. Test bằng `ui.NewTester` (gõ filter, lỗi, Esc, gửi lại), `-race`; cập nhật Gotchas trong `CLAUDE.md`.
 - 11.4 README.md (xong)
 - 11.5. Preview response, giải nén và đọc đúng charset (xong)
-  - 11.5.1. Tab của response tuỳ theo body: text có `Body | Headers`, HTML/SVG thêm `Preview`, ảnh và PDF chỉ có `Preview | Headers`. Không có tab Raw: Body của HTML không bị format, nên đã có Body và Preview là đủ. HTML/XML trong Body được tô màu.
+  - 11.5.1. Response có hai tab `Body | Headers`. Menu "View as" trên thanh response: công tắc Preview (HTML/SVG/ảnh/PDF) và tô màu theo JSON/HTML/XML hoặc chữ thường. Mặc định theo kiểu body: HTML, ảnh, PDF thì bật Preview, còn lại hiện chữ; mỗi response mới về lại mặc định, riêng tab Headers đang mở thì giữ nguyên.
   - 11.5.2. `Content-Encoding` còn sót (khi request tự đặt `Accept-Encoding`): gzip, deflate (zlib hoặc bare), br, zstd, nhiều lớp. Giải nén tối đa 20 MB. Size vẫn là số byte nhận được, kèm tên encoding. Giải không được thì hiện y nguyên và có dòng báo. Save body ghi body đã giải nén.
-  - 11.5.3. Charset tự nhận theo kiểu trình duyệt (BOM > header > `<meta>` của HTML > UTF-8 > windows-1252). Select charset trên thanh response để đọc lại bằng tay, chạy trong goroutine.
+  - 11.5.3. Charset tự nhận theo kiểu trình duyệt (BOM > header > `<meta>` của HTML > UTF-8 > windows-1252). Không có chỗ chọn charset bằng tay (đã bỏ).
   - 11.5.4. Preview là WebView untrusted: HTML chèn CSP `script-src 'none'` và load ở URL của response, nên CSS, ảnh, font vẫn load được; link bấm vào thì mở bằng trình duyệt, form và meta refresh bị chặn. `mygo.json` bật `NSAllowsArbitraryLoadsInWebContent` để tài nguyên `http://` load được. Ảnh, SVG, PDF được phục vụ qua scheme `telepath-preview`.
 
 ---

@@ -26,9 +26,14 @@ var methods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS
 type tab struct {
 	id     string
 	reqTab int
-	// respView is the response's tab shown, by its label, as the tabs
-	// there are depend on the body.
+	// respView is the response's tab shown, "Body" or "Headers".
 	respView string
+	// lang is what the body is highlighted as, one of bodyLangs or "" for
+	// plain text, and previewOn shows it in a web view instead. Both
+	// start over from the type of each response.
+	lang      string
+	previewOn bool
+	viewOpen  bool // the menu of the two
 
 	// drafts are the blank rows of the tables, by table.
 	drafts   map[string]*model.KV
@@ -45,10 +50,8 @@ type tab struct {
 	err  error
 	body *editor.State
 	json bool // the body is JSON, found off the main thread
-	// charset is the one chosen to read the body in, "" for the one the
-	// response says; decodedAs is what body was read as, and
-	// decodeErr why that failed, in which case it's as received.
-	charset   string
+	// decodedAs is the charset body was read in, and decodeErr why that
+	// failed, in which case it's as received.
 	decodedAs string
 	decodeErr error
 	preview   preview
@@ -84,16 +87,23 @@ func (a *app) send(tb *tab) {
 		resp, err := httpx.Send(ctx, client, req)
 		var b readBody
 		if resp != nil {
-			b = readResponse(resp, "")
+			b = readResponse(resp)
 		}
 		a.update(func() {
 			if tb.seq != seq {
 				return
 			}
 			tb.sending, tb.cancel = false, nil
-			tb.resp, tb.err, tb.charset = resp, err, ""
+			tb.resp, tb.err = resp, err
 			if resp != nil {
 				tb.show(b)
+				// A page or a picture reads best as it looks, and the rest as
+				// text. A table of headers looked at over sends stays.
+				tb.lang = b.language
+				tb.previewOn = resp.Previewable() && (resp.HTML() || resp.Binary())
+				if tb.respView != "Headers" {
+					tb.respView = "Body"
+				}
 			}
 		})
 	}()
@@ -109,28 +119,15 @@ type readBody struct {
 	err       error
 }
 
-// readResponse reads the body in charset, or the one the response says
-// when that's "", and formats it. A large body shows as it came, as
-// indenting and highlighting it would stall the window.
-func readResponse(resp *httpx.Response, charset string) readBody {
+// readResponse reads the body in the charset the response says, and
+// formats it. A large body shows as it came, as indenting and
+// highlighting it would stall the window.
+func readResponse(resp *httpx.Response) readBody {
 	b := readBody{big: len(resp.Body) > bigBody, json: resp.JSON()}
-	switch {
-	case resp.Binary() && resp.Previewable():
-		// Shown in the preview alone, which reads the bytes.
-		return b
-	case resp.Binary():
+	if resp.Binary() {
 		b.text = string(resp.Body)
 		return b
 	}
-	if charset == "" {
-		charset = resp.Charset()
-	}
-	b.charset = charset
-	b.text, b.err = httpx.Decode(resp.Body, charset)
-	if b.big {
-		return b
-	}
-	b.text = httpx.PrettyText(b.text, b.json)
 	mt := resp.MediaType()
 	switch {
 	case b.json:
@@ -140,6 +137,11 @@ func readResponse(resp *httpx.Response, charset string) readBody {
 	case strings.HasSuffix(mt, "/xml") || strings.HasSuffix(mt, "+xml"):
 		b.language = "XML"
 	}
+	b.charset = resp.Charset()
+	b.text, b.err = httpx.Decode(resp.Body, b.charset)
+	if !b.big {
+		b.text = httpx.PrettyText(b.text, b.json)
+	}
 	return b
 }
 
@@ -147,26 +149,10 @@ func readResponse(resp *httpx.Response, charset string) readBody {
 func (tb *tab) show(b readBody) {
 	tb.json, tb.decodedAs, tb.decodeErr = b.json, b.charset, b.err
 	buf := editor.NewBuffer(b.text)
-	if b.language != "" {
+	if !b.big {
 		buf.SetLanguage(editor.LanguageNamed(b.language))
 	}
 	tb.body = &editor.State{Buffer: buf, ReadOnly: true, SoftWrap: !b.big}
-}
-
-// readAs reads the body again in charset, "" for the one the response
-// says; until it's read, the body shows as it was.
-func (a *app) readAs(tb *tab, charset string) {
-	tb.charset = charset
-	tb.seq++ // a reading chosen before this one is dropped
-	seq, resp := tb.seq, tb.resp
-	go func() {
-		b := readResponse(resp, charset)
-		a.update(func() {
-			if tb.seq == seq {
-				tb.show(b)
-			}
-		})
-	}()
 }
 
 func (a *app) cancelSend(tb *tab) {
@@ -306,7 +292,7 @@ func statusColor(t *ui.Theme, code int) ui.Color {
 func (a *app) responseBody(c *ui.Context, tb *tab) {
 	t := c.Theme()
 	resp := tb.resp
-	views := responseViews(resp)
+	views := []string{"Body", "Headers"}
 	at := max(slices.Index(views, tb.respView), 0)
 	ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(6, 12).Shrink(0).Children(func() {
 		ui.Text(c, resp.Status).Font(mono).FontFeatures(monoFeatures).FontWeight(700).FontSize(12).TextColor(statusColor(t, resp.StatusCode))
@@ -322,10 +308,9 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		// Where it went, variables and path parameters filled in.
 		ui.Text(c, resp.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()
-		if tb.decodedAs != "" {
-			a.charsetSelect(c, tb)
-		}
-		if tb.body != nil && iconButton(c, copyIcon, "Copy body").Clicked() {
+		a.viewMenu(c, tb)
+		// An image's or a PDF's bytes aren't text to paste.
+		if tb.body != nil && !(resp.Binary() && resp.Previewable()) && iconButton(c, copyIcon, "Copy body").Clicked() {
 			c.Services().WriteClipboard(tb.shown().Buffer.String())
 			c.Toast("Copied the body")
 		}
@@ -357,7 +342,8 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 	if tb.decodeErr != nil {
 		note("Couldn't read the body as "+tb.decodedAs+": shown as received.", t.Warning)
 	}
-	if len(resp.Body) > bigBody && tb.respView != "Preview" {
+	previewing := tb.respView == "Body" && tb.previewOn
+	if len(resp.Body) > bigBody && !previewing {
 		note("A large body: shown as it came, without formatting.", t.TextMuted)
 	}
 	ui.Divider(c)
@@ -365,6 +351,10 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 	case "Body":
 		if len(resp.Body) == 0 {
 			emptyState(c, "Empty body", "")
+			return
+		}
+		if previewing {
+			a.previewView(c, tb)
 			return
 		}
 		if tb.json {
@@ -376,12 +366,6 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 		}
 		styleCode(c, tb.shown())
 		editor.View(c, tb.shown()).Grow(1).FillWidth().Label("Response body")
-	case "Preview":
-		if len(resp.Body) == 0 {
-			emptyState(c, "Empty body", "")
-			return
-		}
-		a.previewView(c, tb)
 	case "Headers":
 		cols := []ui.TableColumn{{Title: "Name", Width: 220}, {Title: "Value"}}
 		ui.Table(c, nil, cols, len(resp.Headers), func(row, col int) {
@@ -398,35 +382,108 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 	}
 }
 
-// responseViews are the response's tabs: no text of an image or a PDF,
-// and a preview of what a web view shows.
-func responseViews(resp *httpx.Response) []string {
-	var views []string
-	if !resp.Binary() || !resp.Previewable() {
-		views = append(views, "Body")
+// bodyLangs are what the body can be highlighted as.
+var bodyLangs = []string{"JSON", "HTML", "XML"}
+
+var (
+	eyeIcon      = icon(`<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>`)
+	checkIcon    = icon(`<path d="M3.5 8.5l3 3 6-7"/>`)
+	dropdownIcon = icon(`<path d="M4.5 6.5L8 10l3.5-3.5"/>`)
+	langIcons    = map[string]*ui.SVG{
+		"JSON": icon(`<path d="M5.5 2.5c-1.5 0-2 .5-2 2v1.5c0 1-.5 2-1.5 2 1 0 1.5 1 1.5 2v1.5c0 1.5.5 2 2 2M10.5 2.5c1.5 0 2 .5 2 2v1.5c0 1 .5 2 1.5 2-1 0-1.5 1-1.5 2v1.5c0 1.5-.5 2-2 2"/>`),
+		"HTML": icon(`<path d="M5 4.5L1.5 8 5 11.5M11 4.5L14.5 8 11 11.5M9.5 3l-3 10"/>`),
+		"XML":  icon(`<path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3M6.5 8L5 9.5 6.5 11M9.5 8l1.5 1.5L9.5 11"/>`),
 	}
-	if resp.Previewable() {
-		views = append(views, "Preview")
+)
+
+// viewMenu picks how the body shows: in a web view, which only a page,
+// an image or a PDF has, or as text highlighted as one of bodyLangs.
+// Choosing either shows the body.
+func (a *app) viewMenu(c *ui.Context, tb *tab) {
+	t := c.Theme()
+	can := tb.resp.Previewable()
+	name := tb.lang
+	if name == "" {
+		name = "Text"
 	}
-	return append(views, "Headers")
+	m := ui.MenuBase(c, &tb.viewOpen)
+	m.Trigger.Gap(5).Padding(3, 6, 3, 8).Radius(6).AlignItems(ui.Center).Border(1, t.Border).
+		FontSize(12).TextColor(t.TextMuted).Label("View as")
+	if m.Trigger.Hovered() || tb.viewOpen {
+		m.Trigger.Background(t.SurfaceHover).TextColor(t.Text)
+	}
+	m.Trigger.Children(func() {
+		if tb.previewOn {
+			ui.Icon(c, eyeIcon).Size(14, 14)
+		}
+		ui.Text(c, name).SingleLine()
+		ui.Icon(c, dropdownIcon).Size(12, 12)
+	})
+	m.Popup(func(panel ui.Element) {
+		panel.Margin(4, 0, 0, 0).Padding(4).Radius(8).Background(t.Background).Border(1, t.Border).MinWidth(170)
+		row := func(item ui.Element) ui.Element {
+			item.Gap(8).Padding(6, 8).Radius(5).AlignItems(ui.Center)
+			if item.Highlighted() {
+				item.Background(t.SurfaceHover)
+			}
+			return item
+		}
+		// The menu stays open as Preview goes on and off, as a switch does.
+		pv := row(m.CheckItem(tb.previewOn).KeepOpen().Disabled(!can)).Children(func() {
+			color := t.Text
+			if !can {
+				color = t.TextMuted
+			}
+			ui.Text(c, "Preview").TextColor(color).Grow(1)
+			knob := t.TextMuted
+			track := t.SurfaceHover
+			if tb.previewOn {
+				knob, track = t.AccentText, t.Accent
+			}
+			ui.Row(c).Size(28, 16).Radius(8).Background(track).Padding(2).Children(func() {
+				if tb.previewOn {
+					ui.Spacer(c)
+				}
+				ui.Row(c).Size(12, 12).Radius(6).Background(knob)
+			})
+		})
+		if pv.Clicked() {
+			tb.previewOn = !tb.previewOn
+			tb.respView = "Body"
+		}
+		ui.Divider(c).Margin(4, 0)
+		for _, l := range bodyLangs {
+			on := tb.lang == l && !tb.previewOn
+			// Labeled apart from the button, which shows the name too.
+			item := row(m.RadioItem(tb.lang == l)).Label("View as " + l).Children(func() {
+				color := t.Text
+				if on {
+					color = accentInk(t)
+				}
+				ui.Icon(c, langIcons[l]).Size(14, 14).TextColor(color)
+				ui.Text(c, l).TextColor(color).Grow(1)
+				if tb.lang == l {
+					ui.Icon(c, checkIcon).Size(14, 14).TextColor(color)
+				}
+			})
+			if item.Clicked() {
+				// Choosing the one shown again leaves plain text.
+				if on {
+					l = ""
+				}
+				tb.setLang(l)
+				tb.previewOn = false
+				tb.respView = "Body"
+			}
+		}
+	})
 }
 
-// charsetSelect reads the body in another charset, for a server that
-// says none, or the wrong one.
-func (a *app) charsetSelect(c *ui.Context, tb *tab) {
-	auto := "Auto"
-	if tb.charset == "" {
-		auto += " (" + tb.decodedAs + ")"
-	}
-	sel := tb.charset
-	if sel == "" {
-		sel = auto
-	}
-	if ui.Select(c, &sel, append([]string{auto}, httpx.Charsets...)).Width(150).FontSize(12).Label("Charset").Changed() {
-		if sel == auto {
-			sel = ""
-		}
-		a.readAs(tb, sel)
+// setLang highlights the body as lang, which a large body isn't.
+func (tb *tab) setLang(lang string) {
+	tb.lang = lang
+	if tb.body != nil && len(tb.resp.Body) <= bigBody {
+		tb.body.Buffer.SetLanguage(editor.LanguageNamed(lang))
 	}
 }
 

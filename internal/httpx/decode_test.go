@@ -135,11 +135,6 @@ func TestDecode(t *testing.T) {
 	if _, err := Decode([]byte("x"), "nope"); err == nil {
 		t.Error("an unknown charset decoded")
 	}
-	for _, name := range Charsets {
-		if _, err := Decode([]byte("x"), name); err != nil {
-			t.Errorf("%s: %v", name, err)
-		}
-	}
 }
 
 func TestResponseKinds(t *testing.T) {

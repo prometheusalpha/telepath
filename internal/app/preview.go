@@ -55,11 +55,10 @@ func servePreview(w http.ResponseWriter, r *http.Request) {
 // shows and kept with the tab.
 type preview struct {
 	view *mygo.WebView
-	// of and charset are what it was loaded with; path is its body at
+	// of is the response it was loaded with; path is its body at
 	// previewScheme, if it went there.
-	of      *httpx.Response
-	charset string
-	path    string
+	of   *httpx.Response
+	path string
 	// url is the document's, the one the page may move within, to its
 	// anchors. The navigation handler reads it off the main thread.
 	url atomic.Pointer[string]
@@ -104,7 +103,7 @@ func (a *app) previewView(c *ui.Context, tb *tab) {
 			}
 		})
 	}
-	if p.of != tb.resp || p.charset != tb.decodedAs {
+	if p.of != tb.resp {
 		a.loadPreview(tb)
 	}
 	ui.WebView(c, p.view).Grow(1).AlignSelf(ui.Stretch)
@@ -112,7 +111,7 @@ func (a *app) previewView(c *ui.Context, tb *tab) {
 
 func (a *app) loadPreview(tb *tab) {
 	p, resp := &tb.preview, tb.resp
-	p.of, p.charset = resp, tb.decodedAs
+	p.of = resp
 	if p.path != "" {
 		previewDocs.Delete(p.path)
 		p.path = ""

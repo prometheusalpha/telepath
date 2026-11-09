@@ -20,18 +20,6 @@ import (
 	"golang.org/x/text/encoding/htmlindex"
 )
 
-// Charsets are those the panel offers to read a body as, by their
-// WHATWG names; iso-8859-1 is not among them, as it is windows-1252
-// there.
-var Charsets = []string{
-	"utf-8", "utf-16le", "utf-16be",
-	"windows-1252", "iso-8859-2", "windows-1250",
-	"windows-1251", "koi8-r", "iso-8859-7", "windows-1253",
-	"windows-1254", "iso-8859-8", "windows-1255", "windows-1256",
-	"windows-1257", "windows-1258", "windows-874",
-	"shift_jis", "euc-jp", "iso-2022-jp", "gbk", "gb18030", "big5", "euc-kr",
-}
-
 // decodeContent undoes the Content-Encoding the transport left in place,
 // as it does when the request sets its own Accept-Encoding. Codings are
 // listed in the order applied, so they come off from the last. What
