@@ -263,7 +263,9 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 		case tb.err != nil:
 			ui.Column(c).Grow(1).Center().Gap(6).Padding(24).Children(func() {
 				ui.Text(c, "Couldn't send the request").FontWeight(600).TextColor(t.Danger)
-				ui.Text(c, tb.err.Error()).FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted).Selectable()
+				// A URL in the message has no place to break, and the centered column
+				// would let it run past the pane on both sides, so cap it at the pane.
+				ui.Text(c, tb.err.Error()).FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted).Selectable().MaxWidthPercent(100)
 			})
 		case tb.resp == nil:
 			hint := "Press Send"

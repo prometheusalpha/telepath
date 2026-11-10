@@ -205,3 +205,27 @@ func TestLongHeaderValueWraps(t *testing.T) {
 		t.Errorf("value %+v is not wrapped in its token", r)
 	}
 }
+
+func TestLongErrorWraps(t *testing.T) {
+	long := "http://127.0.0.1:1/analytics/period-value?" + strings.Repeat("category_name=0027&", 20)
+	a, _, updates := sendingApp(long)
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("ping")
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyEnter)
+	tt.Frame()
+	(<-updates)()
+	tt.Frame()
+	for _, s := range tt.Texts() {
+		if strings.HasPrefix(s, "Get ") {
+			// Broken only at the "?", the message is three lines, the
+			// middle one running past the pane; broken in the query too,
+			// it is more.
+			if r, _ := tt.Find(s); r.H < 60 {
+				t.Errorf("error %+v is not wrapped in its URL", r)
+			}
+			return
+		}
+	}
+	t.Errorf("no error message, texts %q", tt.Texts())
+}
