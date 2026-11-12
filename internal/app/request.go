@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"mime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -42,6 +44,7 @@ type tab struct {
 	pasted   *model.Request // a curl command pasted into the URL, for next frame
 
 	sending bool
+	sentAt  time.Time // frame time of the send, for the clock while sending
 	cancel  context.CancelFunc
 	// seq tells a response apart from those of sends canceled or replaced
 	// since, which may still arrive.
@@ -61,6 +64,9 @@ type tab struct {
 	missing []string
 }
 
+// tick is how often the clock while sending moves.
+const tick = 100 * time.Millisecond
+
 func (t *tab) stop() {
 	if t.cancel != nil {
 		t.cancel()
@@ -70,12 +76,13 @@ func (t *tab) stop() {
 	t.seq++
 }
 
-func (a *app) send(tb *tab) {
+func (a *app) send(c *ui.Context, tb *tab) {
 	n := a.tree.byID[tb.id]
 	if n == nil || n.Request == nil {
 		return
 	}
 	tb.stop()
+	tb.sentAt = c.Now()
 	// The goroutine reads a copy, expanded: the user may keep editing
 	// meanwhile.
 	req, missing := a.env.Request(n.Request)
@@ -171,7 +178,7 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		c.Toast("Imported cURL")
 	}
 	if a.shortcut(c, "send") {
-		a.send(tb)
+		a.send(c, tb)
 	}
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(10, 12).Shrink(0).Children(func() {
 		m := ui.Select(c, &r.Method, methods).Width(104).Font(mono).FontFeatures(monoFeatures).FontWeight(700).
@@ -192,14 +199,14 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 			a.changed()
 		}
 		if url.Submitted() {
-			a.send(tb)
+			a.send(c, tb)
 		}
 		if tb.sending {
 			if ui.Button(c, "Cancel").Width(84).Clicked() {
 				a.cancelSend(tb)
 			}
 		} else if ui.PrimaryButton(c, "Send").Width(84).Tooltip(a.hint("", "send")).Clicked() {
-			a.send(tb)
+			a.send(c, tb)
 		}
 	})
 	request := func() {
@@ -257,6 +264,12 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 			ui.Column(c).Grow(1).Center().Gap(10).Children(func() {
 				ui.Spinner(c)
 				ui.Text(c, "Sending…").TextColor(t.TextMuted)
+				// Tenths shown as they pass, not rounded, so the next frame is
+				// due when the next tenth starts.
+				since := c.Now().Sub(tb.sentAt)
+				ui.Text(c, fmt.Sprintf("%.1fs", since.Truncate(tick).Seconds())).
+					FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted)
+				c.After(tick - since%tick)
 			})
 		case errors.Is(tb.err, context.Canceled):
 			emptyState(c, "Request canceled", "")

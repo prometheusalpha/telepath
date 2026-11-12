@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 
@@ -42,8 +43,12 @@ func TestSendShowsResponse(t *testing.T) {
 	}
 	tt.Key(ui.Cmd, ui.KeyEnter)
 	tt.Frame()
-	if !tt.HasText("Sending…") || !tt.HasText("Cancel") {
+	if !tt.HasText("Sending…") || !tt.HasText("Cancel") || !tt.HasText("0.0s") {
 		t.Fatalf("while sending, texts %q", tt.Texts())
+	}
+	tt.Advance(1250 * time.Millisecond)
+	if !tt.HasText("1.2s") {
+		t.Fatalf("1.25s into the send, texts %q", tt.Texts())
 	}
 	(<-updates)()
 	tt.Frame()
