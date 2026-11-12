@@ -8,8 +8,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-app=build/darwin-arm64/telepath.app
-dest=/Applications/telepath.app
+app=build/darwin-arm64/Telepath.app
+dest=/Applications/Telepath.app
 local_identity="Telepath Local Signing"
 if [[ -z ${SIGN_IDENTITY:-} ]] && security find-identity -v -p codesigning | grep -q "\"$local_identity\""; then
 	SIGN_IDENTITY=$local_identity
@@ -17,7 +17,7 @@ fi
 identity=${SIGN_IDENTITY:--}
 
 if pgrep -qf "$dest/"; then
-	echo "telepath is running: quit it first." >&2
+	echo "Telepath is running: quit it first." >&2
 	exit 1
 fi
 

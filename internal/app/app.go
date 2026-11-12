@@ -468,7 +468,7 @@ func Run() {
 		// Before the window shows, so it opens in the saved appearance.
 		mygo.Theme.SetSource(themeSource(ws.Theme))
 		win = mygo.NewWindow(mygo.WindowOptions{
-			Title:          "telepath",
+			Title:          "Telepath",
 			Width:          1200,
 			Height:         780,
 			MinWidth:       900,

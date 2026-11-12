@@ -40,7 +40,7 @@ cd telepath
 ./install.sh
 ```
 
-`install.sh` builds the app, signs it, verifies the signature and copies it to `/Applications/telepath.app`, replacing any previous copy (quit Telepath first). It signs with a certificate named `Telepath Local Signing` when your Keychain has one, ad hoc otherwise; set `SIGN_IDENTITY` to use another certificate:
+`install.sh` builds the app, signs it, verifies the signature and copies it to `/Applications/Telepath.app`, replacing any previous copy (quit Telepath first). It signs with a certificate named `Telepath Local Signing` when your Keychain has one, ad hoc otherwise; set `SIGN_IDENTITY` to use another certificate:
 
 ```sh
 security find-identity -v -p codesigning   # list your signing identities
@@ -49,7 +49,7 @@ SIGN_IDENTITY="Apple Development: …" ./install.sh
 
 A stable certificate keeps the app's signature the same from build to build, so macOS doesn't ask again for access to the Keychain after each update.
 
-To only build the app bundle, into `build/darwin-arm64/telepath.app`:
+To only build the app bundle, into `build/darwin-arm64/Telepath.app`:
 
 ```sh
 go tool mygo build -skip-dmg
@@ -89,7 +89,7 @@ In the sidebar, Enter renames the selected row and ⌘↓ opens it.
 
 ### Where your data lives
 
-Everything is saved automatically to `~/Library/Application Support/telepath/`:
+Everything is saved automatically to `~/Library/Application Support/Telepath/`:
 
 - `workspace.json`: folders, requests, variables and settings. Secrets are stored as `enc:v1:…`; everything else is plain JSON.
 - `session.json`: open tabs and pane sizes.
