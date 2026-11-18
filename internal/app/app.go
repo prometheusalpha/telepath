@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -25,7 +26,9 @@ type app struct {
 	ws          *model.Workspace
 	path        string // "" keeps the workspace in memory, as tests do
 	sessionPath string
-	sealer      *store.Sealer // nil saves secrets as they are
+	responseDir string         // where the last response of each request is kept
+	writes      sync.WaitGroup // of responses, for quitting after them
+	sealer      *store.Sealer  // nil saves secrets as they are
 	tree        tree
 	env         vars.Env // ws.Env, looked up as the views build
 
@@ -128,9 +131,11 @@ func newApp(ws *model.Workspace, path string) *app {
 		pickFile: func(func(string)) {},
 		openFile: func(func(string, []byte)) {},
 		saveFile: func(string, []byte, func(error)) {},
+		update:   func(func()) {},
 	}
 	if path != "" {
 		a.sessionPath = filepath.Join(filepath.Dir(path), "session.json")
+		a.responseDir = filepath.Join(filepath.Dir(path), "responses")
 	}
 	a.ws.Walk(func(n, _ *model.Node) bool {
 		if n.Folder != nil && n.Folder.Open {
@@ -178,6 +183,27 @@ func (a *app) restore(s store.Session) {
 	}
 	a.responseRight = s.ResponseRight
 	a.dirty = false
+}
+
+// pruneResponses removes, off the main thread, the kept responses of
+// requests no longer in the workspace.
+func (a *app) pruneResponses() {
+	if a.responseDir == "" {
+		return
+	}
+	keep := map[string]bool{}
+	for id, n := range a.tree.byID {
+		if n.Request != nil {
+			keep[id] = true
+		}
+	}
+	a.writes.Add(1)
+	go func() {
+		defer a.writes.Done()
+		if err := store.PruneResponses(a.responseDir, func(id string) bool { return keep[id] }); err != nil {
+			log.Print(err)
+		}
+	}()
 }
 
 // changed marks the workspace for saving and pushes the save back, so a
@@ -369,10 +395,12 @@ func Run() {
 		case sealErr != nil:
 			a.toast = "Secrets are saved unencrypted: the Keychain isn't available"
 		}
+		a.pruneResponses()
 		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 			if err := a.flush(); err != nil {
 				log.Print(err)
 			}
+			a.writes.Wait()
 		})
 		var win *mygo.Window
 		themeItem := func(id, label, theme string) *mygo.MenuItem {

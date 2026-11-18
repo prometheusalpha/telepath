@@ -21,7 +21,7 @@ go vet ./... && go test ./...
 ## Cấu trúc
 
 - `internal/model`: workspace, cây `Node` (đúng một trong `Folder`/`Request` khác nil), Add/Remove/Duplicate. Không phụ thuộc UI.
-- `internal/store`: đọc/ghi `workspace.json`, ghi qua file `.tmp` rồi rename.
+- `internal/store`: đọc/ghi `workspace.json`, `session.json` và response đã lưu (`responses/`), ghi qua file `.tmp` rồi rename.
 - `internal/model/url.go`: đồng bộ URL ↔ Query, nhận diện `:name` trong path.
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
@@ -55,7 +55,8 @@ go vet ./... && go test ./...
 - `EditableText` không mở chế độ sửa từ code được, nên đổi tên dùng `TextInputBase` riêng (`renameInput`): `AutoFocus`, gọi `SetTextSelection` cho đến khi đã focus (để gõ là thay cả tên cũ), commit khi Enter hoặc mất focus, Esc thì huỷ.
 
 ### Tab và gửi request
-- Response, trạng thái đang gửi, editor của body nằm trong `tab` (chỉ trong bộ nhớ), không nằm trong model nên không được lưu.
+- Response, trạng thái đang gửi, editor của body nằm trong `tab`, không nằm trong model. Riêng response gần nhất của mỗi request còn được lưu ra `responses/<id>.json` + `<id>.body` (`store.SaveResponse`, body nguyên byte vì JSON sẽ base64), cạnh `workspace.json`, không mã hoá. Ghi trong goroutine (`a.keepResponse`, đếm bằng `a.writes` để thoát app chờ ghi xong); mọi ghi/đọc/dọn đi qua một mutex trong `store`. Gửi lỗi hay cancel không ghi đè response đã lưu.
+- Tab đọc lại response đã lưu ở frame đầu tiên nó được hiện (`tb.looked`, đọc trong goroutine qua `a.update`, so `seq` như lúc gửi), không đọc lúc `openTab`: `restore` chạy trước khi có `win.Update`, và mở app với nhiều tab thì chỉ tab đang xem phải đọc. Lúc đang đọc (`tb.loading`) khu response để trống. `newApp` gán `update` không làm gì, test cần response thì thay bằng channel. `.json` có `bodyLen`; không khớp với file `.body` thì coi như không có. Xoá request ở sidebar thì `pruneResponses`; mở app cũng dọn một lần.
 - Gửi request chạy trong goroutine, đọc một bản copy của `model.Request`, rồi trả kết quả qua `a.update` (= `win.Update` khi chạy app thật). Mỗi lần gửi hoặc cancel thì tăng `tab.seq`; response về mà `seq` không khớp thì bỏ qua (response muộn của lần đã cancel).
 - Body response được format trong goroutine gửi request, không làm trên main thread. Lớn hơn `bigBody` (2 MB) thì hiện y nguyên như nhận được: không format, không tô màu, không soft wrap. Ở nhánh đó phải xét `!big` trước khi gọi `resp.JSON()`, vì `json.Valid` sẽ quét toàn bộ body.
 - Sửa model ở đâu cũng phải `a.changed()`, kể cả Select/URL (`Changed()`). `changed()` còn đóng tab của request đã bị xoá (`pruneTabs`).

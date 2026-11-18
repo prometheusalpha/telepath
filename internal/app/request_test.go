@@ -3,6 +3,8 @@ package app
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"telepath/internal/model"
+	"telepath/internal/store"
 )
 
 // sendingApp has one request in the sidebar; its update hands the
@@ -233,4 +236,61 @@ func TestLongErrorWraps(t *testing.T) {
 		}
 	}
 	t.Errorf("no error message, texts %q", tt.Texts())
+}
+
+func TestResponseKeptAcrossRuns(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+	path := filepath.Join(t.TempDir(), "workspace.json")
+	ws := &model.Workspace{}
+	n := model.NewRequest("ping")
+	n.Request.URL = srv.URL
+	ws.Add(n, "")
+	a := newApp(ws, path)
+	updates := make(chan func(), 1)
+	a.update = func(fn func()) { updates <- fn }
+	tt := ui.NewTester(a.view, 1200, 780)
+	tt.Click("ping")
+	tt.Frame()
+	(<-updates)() // nothing kept yet
+	tt.Key(ui.Cmd, ui.KeyEnter)
+	tt.Frame()
+	(<-updates)()
+	tt.Frame()
+	a.writes.Wait()
+
+	// Closed and opened again, the tab reads it back.
+	tt.Key(ui.Cmd, ui.KeyW)
+	tt.Frame()
+	tt.Click("ping")
+	tt.Frame()
+	(<-updates)()
+	tt.Frame()
+	if !tt.HasText("200 OK") || a.tabs[0].body.Buffer.String() != "{\n  \"ok\": true\n}" {
+		t.Fatalf("reopened tab, texts %q", tt.Texts())
+	}
+
+	// So does the next run, which finds the tab in the session.
+	tt.Advance(saveDelay + 100*time.Millisecond)
+	b := newApp(ws, path)
+	b.update = func(fn func()) { updates <- fn }
+	b.restore(store.LoadSession(b.sessionPath))
+	tt = ui.NewTester(b.view, 1200, 780)
+	(<-updates)()
+	tt.Frame()
+	if !tt.HasText("200 OK") {
+		t.Fatalf("next run, texts %q", tt.Texts())
+	}
+
+	// Deleting the request drops what was kept of it.
+	ws.Remove(n.ID)
+	b.changed()
+	b.pruneResponses()
+	b.writes.Wait()
+	if left, _ := os.ReadDir(b.responseDir); len(left) != 0 {
+		t.Errorf("left %d files", len(left))
+	}
 }

@@ -94,7 +94,7 @@ type Body struct{ Kind string; Text string; Form []KV } // none | json | text | 
 type Auth struct{ Kind string; Username, Password, Token, Key, Value, In string } // none | basic | bearer | apikey
 ```
 
-Lưu một file `workspace.json` trong `PathUserData`; tab đang mở + kích thước split lưu riêng ở `session.json`.
+Lưu một file `workspace.json` trong `PathUserData`; tab đang mở + kích thước split lưu riêng ở `session.json`; response gần nhất của từng request ở `responses/` (11.6).
 
 ---
 
@@ -236,6 +236,10 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
   - 11.5.2. `Content-Encoding` còn sót (khi request tự đặt `Accept-Encoding`): gzip, deflate (zlib hoặc bare), br, zstd, nhiều lớp. Giải nén tối đa 20 MB. Size vẫn là số byte nhận được, kèm tên encoding. Giải không được thì hiện y nguyên và có dòng báo. Save body ghi body đã giải nén.
   - 11.5.3. Charset tự nhận theo kiểu trình duyệt (BOM > header > `<meta>` của HTML > UTF-8 > windows-1252). Không có chỗ chọn charset bằng tay (đã bỏ).
   - 11.5.4. Preview là WebView untrusted: HTML chèn CSP `script-src 'none'` và load ở URL của response, nên CSS, ảnh, font vẫn load được; link bấm vào thì mở bằng trình duyệt, form và meta refresh bị chặn. `mygo.json` bật `NSAllowsArbitraryLoadsInWebContent` để tài nguyên `http://` load được. Ảnh, SVG, PDF được phục vụ qua scheme `telepath-preview`.
+- 11.6. Giữ response gần nhất của mỗi request, kể cả khi đóng tab hay thoát app (xong)
+  - 11.6.1. Lưu ở `responses/` cạnh `workspace.json`: `<id>.json` (status, headers, thời gian, URL, encoding, thời điểm nhận) và `<id>.body` (body nguyên byte, không base64). Lưu cả body tới 20 MB, không mã hoá. Chỉ response HTTP thật (cả 4xx/5xx) được lưu; lỗi kết nối hay cancel thì giữ response cũ.
+  - 11.6.2. Tab đọc lại response đã lưu lần đầu được hiện (cả tab khôi phục từ session), trong goroutine. Filter và "View as" không lưu, về mặc định như response mới.
+  - 11.6.3. Thanh response hiện giờ nhận (`15:04`, khác ngày thì kèm ngày), tooltip là ngày giờ đầy đủ. Xoá request thì xoá file của nó; mở app cũng dọn file của request không còn.
 
 ---
 

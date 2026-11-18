@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"mime"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"telepath/internal/httpx"
 	"telepath/internal/model"
+	"telepath/internal/store"
 )
 
 // bigBody is the size past which a response body shows unformatted.
@@ -23,8 +25,9 @@ const bigBody = 2 << 20
 
 var methods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
-// tab is an open request: what the workspace doesn't keep, as the last
-// response, which lives only while the tab does.
+// tab is an open request: what the workspace doesn't keep. The last
+// response is also kept on disk, and read back the first time the tab
+// shows.
 type tab struct {
 	id     string
 	reqTab int
@@ -48,11 +51,15 @@ type tab struct {
 	cancel  context.CancelFunc
 	// seq tells a response apart from those of sends canceled or replaced
 	// since, which may still arrive.
-	seq  int
-	resp *httpx.Response
-	err  error
-	body *editor.State
-	json bool // the body is JSON, found off the main thread
+	seq int
+	// looked is set once the tab looked for its kept response, and loading
+	// while it reads it.
+	looked  bool
+	loading bool
+	resp    *httpx.Response
+	err     error
+	body    *editor.State
+	json    bool // the body is JSON, found off the main thread
 	// decodedAs is the charset body was read in, and decodeErr why that
 	// failed, in which case it's as received.
 	decodedAs string
@@ -82,6 +89,7 @@ func (a *app) send(c *ui.Context, tb *tab) {
 		return
 	}
 	tb.stop()
+	tb.looked, tb.loading = true, false
 	tb.sentAt = c.Now()
 	// The goroutine reads a copy, expanded: the user may keep editing
 	// meanwhile.
@@ -105,16 +113,68 @@ func (a *app) send(c *ui.Context, tb *tab) {
 				return
 			}
 			tb.sending, tb.cancel = false, nil
-			tb.resp, tb.err = resp, err
+			tb.err = err
 			if resp != nil {
-				tb.show(b)
-				// A page or a picture reads best as it looks, and the rest as
-				// text. A table of headers looked at over sends stays.
-				tb.lang = b.language
-				tb.previewOn = resp.Previewable() && (resp.HTML() || resp.Binary())
-				if tb.respView != "Headers" {
-					tb.respView = "Body"
-				}
+				tb.received(resp, b)
+				a.keepResponse(tb.id, resp)
+			}
+		})
+	}()
+}
+
+// received shows resp, read into b.
+func (tb *tab) received(resp *httpx.Response, b readBody) {
+	tb.resp = resp
+	tb.show(b)
+	// A page or a picture reads best as it looks, and the rest as text. A
+	// table of headers looked at over sends stays.
+	tb.lang = b.language
+	tb.previewOn = resp.Previewable() && (resp.HTML() || resp.Binary())
+	if tb.respView != "Headers" {
+		tb.respView = "Body"
+	}
+}
+
+// keepResponse writes resp as the request's last, off the main thread. A
+// failed send keeps the response before it.
+func (a *app) keepResponse(id string, resp *httpx.Response) {
+	if a.responseDir == "" {
+		return
+	}
+	a.writes.Add(1)
+	go func() {
+		defer a.writes.Done()
+		if err := store.SaveResponse(a.responseDir, id, resp); err != nil {
+			log.Print(err)
+		}
+	}()
+}
+
+// loadResponse reads back the response kept for the tab's request, unless
+// a send came first.
+func (a *app) loadResponse(tb *tab) {
+	tb.looked = true
+	if a.responseDir == "" {
+		return
+	}
+	tb.loading = true
+	seq, dir, id := tb.seq, a.responseDir, tb.id
+	go func() {
+		resp, err := store.LoadResponse(dir, id)
+		if err != nil {
+			log.Print(err)
+		}
+		var b readBody
+		if resp != nil {
+			b = readResponse(resp)
+		}
+		a.update(func() {
+			if tb.seq != seq {
+				return
+			}
+			tb.loading = false
+			if resp != nil {
+				tb.received(resp, b)
 			}
 		})
 	}()
@@ -180,6 +240,9 @@ func (a *app) requestView(c *ui.Context, tb *tab) {
 		tb.bodyEdit = nil // the editor leads once made, so it's made anew
 		a.changed()
 		c.Toast("Imported cURL")
+	}
+	if !tb.looked {
+		a.loadResponse(tb)
 	}
 	if a.shortcut(c, "send") {
 		a.send(c, tb)
@@ -275,6 +338,8 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 					FontSize(12).Font(mono).FontFeatures(monoFeatures).TextColor(t.TextMuted)
 				c.After(tick - since%tick)
 			})
+		case tb.loading:
+			// Reading the kept response is quick; a placeholder would only flash.
 		case errors.Is(tb.err, context.Canceled):
 			emptyState(c, "Request canceled", "")
 		case tb.err != nil:
@@ -294,6 +359,18 @@ func (a *app) responseView(c *ui.Context, tb *tab) {
 			a.responseBody(c, tb)
 		}
 	})
+}
+
+// receivedAt is when a response came, as short as tells it from now.
+func receivedAt(at, now time.Time) string {
+	at, now = at.Local(), now.Local()
+	switch {
+	case at.YearDay() == now.YearDay() && at.Year() == now.Year():
+		return at.Format("15:04")
+	case at.Year() == now.Year():
+		return at.Format("2 Jan 15:04")
+	}
+	return at.Format("2 Jan 2006 15:04")
 }
 
 func statusColor(t *ui.Theme, code int) ui.Color {
@@ -324,6 +401,11 @@ func (a *app) responseBody(c *ui.Context, tb *tab) {
 			size += " (showing the first " + httpx.FormatSize(httpx.MaxBody) + ")"
 		}
 		ui.Text(c, size).FontSize(12).TextColor(t.TextMuted)
+		// A response kept from before may be days old.
+		if !resp.Received.IsZero() {
+			ui.Text(c, receivedAt(resp.Received, c.Now())).FontSize(12).TextColor(t.TextMuted).
+				Tooltip("Received " + resp.Received.Local().Format("Mon 2 Jan 2006 15:04:05"))
+		}
 		// Where it went, variables and path parameters filled in.
 		ui.Text(c, resp.URL).Font(mono).FontFeatures(monoFeatures).FontSize(11).TextColor(t.TextMuted).SingleLine().
 			Grow(1).MinWidth(0).Tooltip(resp.URL).Selectable()

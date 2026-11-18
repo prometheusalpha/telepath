@@ -95,6 +95,7 @@ func (a *app) sidebar(c *ui.Context) {
 	if n != nil && ui.AlertDialog(c, &a.askDelete, fmt.Sprintf("Delete “%s”?", n.Name), msg, "Cancel", "Delete") == 1 {
 		a.ws.Remove(n.ID)
 		a.changed()
+		a.pruneResponses()
 	}
 	if !a.askDelete {
 		a.deleting = nil

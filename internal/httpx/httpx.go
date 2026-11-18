@@ -40,6 +40,7 @@ type Response struct {
 	// EncodingErr is why it couldn't be, and Body is then as received.
 	Encoding    string
 	EncodingErr error
+	Received    time.Time // when it ended, as a response kept from an earlier run is shown
 }
 
 // JSON reports whether the body is JSON, by its type or, for servers that
@@ -247,6 +248,7 @@ func Send(ctx context.Context, client *http.Client, r *model.Request) (*Response
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
 		Duration:   time.Since(start),
+		Received:   time.Now(),
 		Size:       int64(len(body)),
 		URL:        req.URL.String(),
 	}
