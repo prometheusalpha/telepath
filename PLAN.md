@@ -124,7 +124,7 @@ Mục tiêu: chạy được cửa sổ với layout đúng, chưa có dữ li�
 
 - Click request trong sidebar → mở tab (đã mở thì focus). Tab: badge method, tên, nút đóng. Đóng tab bằng ⌘W.
 - Thanh request: dropdown method (`Select`), ô URL (mono), nút Send (⌘↵) / Cancel khi đang chạy.
-- `internal/httpx`: build + gửi request, timeout mặc định 30s, đo thời gian, size.
+- `internal/httpx`: build + gửi request, timeout đặt ở Settings (`Workspace.Timeout`, 0 = không giới hạn), đo thời gian, size.
 - Khu response (`SplitVerticalPercent` dưới request): status (màu theo 2xx/3xx/4xx/5xx), time, size; tab Body (code editor read-only, JSON tự pretty-print + highlight) và Headers (table).
 - Lỗi mạng hiển thị rõ ràng trong khu response, không popup.
 - Auto-save: mọi thay đổi trong editor ghi thẳng vào workspace (store tự debounce), không có trạng thái "chưa lưu".

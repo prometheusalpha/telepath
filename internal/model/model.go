@@ -20,6 +20,8 @@ type Workspace struct {
 	// bodies, 0 the default.
 	MonoFont string  `json:"monoFont,omitempty"`
 	MonoSize float32 `json:"monoSize,omitempty"`
+	// Timeout is how long a request may take, in seconds, 0 for no limit.
+	Timeout int `json:"timeout,omitempty"`
 	// Shortcuts are the keys set in Settings by command, as "Shift+Cmd+N",
 	// "" for none; a command not in it has its default.
 	Shortcuts map[string]string `json:"shortcuts,omitempty"`

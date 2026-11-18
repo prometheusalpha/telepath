@@ -26,7 +26,7 @@ go vet ./... && go test ./...
 - `internal/vars`: tìm và thay `{{name}}` (`Refs` trả vị trí theo rune để tô màu, `Env.Request` trả bản copy request đã thay biến).
 - `internal/importx`: đọc file export của app và collection Postman v2.1 (`Parse` phân biệt theo nội dung file, không theo tên), parse và xuất lệnh cURL. Fixture Postman ở `internal/importx/testdata/`.
 - `internal/jsonpath`: JSONPath theo RFC 9535 (không có hàm `length()`/`match()`…), dùng cho ô filter của response. `Value` riêng giữ thứ tự key và chữ của số.
-- `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (timeout 30s, đọc tối đa 20 MB body), pretty-print JSON. `decode.go`: giải `Content-Encoding`, nhận diện và giải charset, phân loại body (HTML/binary/previewable).
+- `internal/httpx`: dựng `http.Request` từ model (thay path param, escape query, headers, body JSON/Text/Form/Multipart), gửi (không tự đặt timeout, app đặt qua context theo `Workspace.Timeout`; đọc tối đa 20 MB body), pretty-print JSON. `decode.go`: giải `Content-Encoding`, nhận diện và giải charset, phân loại body (HTML/binary/previewable).
 - `internal/app`: toàn bộ giao diện, một package vì mọi view đều là method của `*app` (`app.go` có `Run`: menu, dialog; `keychain.go` giữ khoá; còn lại `sidebar.go`, `tabs.go`, `request.go`, `filter.go`, `kvtable.go`, `env.go`, `search.go`, `transfer.go`, `suggest.go`, `preview.go`, `settings.go`, `shortcuts.go`, `jwt.go`, `fonts.go`, `theme.go`, `widgets.go`). Đừng đặt tên package là `ui`, sẽ trùng với `mygo/ui`.
 - Root chỉ có `main.go` gọi `app.Run()`; code mới không để ở root.
 

@@ -21,8 +21,6 @@ import (
 	"telepath/internal/model"
 )
 
-const Timeout = 30 * time.Second
-
 // MaxBody caps what is read into memory; the panel says when it cut.
 const MaxBody = 20 << 20
 
@@ -231,8 +229,6 @@ func writeFile(w *multipart.Writer, field, path string) error {
 }
 
 func Send(ctx context.Context, client *http.Client, r *model.Request) (*Response, error) {
-	ctx, cancel := context.WithTimeout(ctx, Timeout)
-	defer cancel()
 	req, err := Build(ctx, r)
 	if err != nil {
 		return nil, err

@@ -91,6 +91,15 @@ func (a *app) generalSettings(c *ui.Context) {
 				}
 			})
 		}).Description("The request and response bodies.")
+		timeout := float64(a.ws.Timeout)
+		ui.Field(c, "Request timeout", func() {
+			ui.Row(c).Children(func() {
+				if ui.NumberInput(c, &timeout, 0, 3600, 1).Width(110).Changed() {
+					a.ws.Timeout = int(timeout)
+					a.changed()
+				}
+			})
+		}).Description("Seconds a request may take, reading the body included. 0 is no limit.")
 	})
 }
 

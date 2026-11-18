@@ -86,7 +86,11 @@ func (a *app) send(c *ui.Context, tb *tab) {
 	// The goroutine reads a copy, expanded: the user may keep editing
 	// meanwhile.
 	req, missing := a.env.Request(n.Request)
+	// The limit covers the whole exchange, body included; 0 is none.
 	ctx, cancel := context.WithCancel(context.Background())
+	if s := a.ws.Timeout; s > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(s)*time.Second)
+	}
 	tb.sending, tb.cancel, tb.err, tb.missing = true, cancel, nil, missing
 	seq := tb.seq
 	client := a.client
